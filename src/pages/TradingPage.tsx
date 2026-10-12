@@ -28,7 +28,6 @@ import {
   useJournalEntries,
   useOrders,
   usePositions,
-  useSymbols,
   useUpdateJournalEntry,
 } from "../services/queries.ts";
 import type { Order, PlaceOrderInput, Position, Symbol } from "../services/schemas.ts";
@@ -53,6 +52,10 @@ import { useReplayChartData } from "./trading/useReplayChartData.ts";
 import { useReplayPlayback } from "./trading/useReplayPlayback.ts";
 import { getPipDigits } from "./trading/utils.ts";
 import { WatchlistPanel } from "./trading/WatchlistPanel.tsx";
+import { t as translateNow } from "../i18n/index.ts";
+import { MultiTimeframeView } from "../components/structure/MultiTimeframeView.tsx";
+import { GuidePanel } from "../components/structure/GuidePanel.tsx";
+import { useStructureStore } from "../lib/structure/store.ts";
 
 type ErrorWithMessage = { message?: string };
 
@@ -73,7 +76,7 @@ function getErrorMessage(err: unknown): string {
     const message = (err as ErrorWithMessage).message;
     if (typeof message === "string" && message.length > 0) return message;
   }
-  return "Request failed";
+  return translateNow("err.request");
 }
 
 export function TradingPage() {
@@ -86,6 +89,7 @@ export function TradingPage() {
     }
   }, []);
 
+  const structureView = useStructureStore((s) => s.view);
   const {
     selectedSymbol,
     setSelectedSymbol,
@@ -219,7 +223,8 @@ export function TradingPage() {
   const [confirmLoading, setConfirmLoading] = useState(false);
 
   const queryClient = useQueryClient();
-  const { data: symbols = [] } = useSymbols();
+  // Watchlist lives in the trading store (persisted per browser, see services/server/market.ts).
+  const symbols = _storeSymbols;
   const isFeedConnected = useIsFeedConnected();
 
   // Prime the active symbol with a fresh server-side snapshot immediately on
@@ -249,10 +254,7 @@ export function TradingPage() {
   const handleChartModifyPosition = useCallback(
     async (positionId: string, mods: { takeProfit?: number | null; stopLoss?: number | null }) => {
       if (!isFeedConnected) {
-        toast.warning(
-          "No Data Feed",
-          "Cannot modify positions while disconnected from the data feed",
-        );
+        toast.warning(translateNow("toast.noFeed"), translateNow("toast.noFeed.modify"));
         if (activeAccountId)
           queryClient.invalidateQueries({
             queryKey: ["positions", activeAccountId],
@@ -263,14 +265,17 @@ export function TradingPage() {
         await api.modifyPosition(positionId, mods);
         const field = mods.takeProfit !== undefined ? "TP" : "SL";
         const price = mods.takeProfit !== undefined ? mods.takeProfit : mods.stopLoss;
-        toast.success(`${field} Updated`, `${field} set to ${price}`);
+        toast.success(
+          translateNow("toast.fieldUpdated", { field }),
+          translateNow("toast.fieldSet", { field, price: String(price) }),
+        );
         if (activeAccountId) {
           queryClient.invalidateQueries({
             queryKey: ["positions", activeAccountId],
           });
         }
       } catch (err: unknown) {
-        toast.error("Modify Failed", getErrorMessage(err));
+        toast.error(translateNow("toast.modifyFailed"), getErrorMessage(err));
         // Refetch to revert price line to original value
         if (activeAccountId) {
           queryClient.invalidateQueries({
@@ -288,7 +293,7 @@ export function TradingPage() {
   const handleQuickOrder = useCallback(
     (side: "BUY" | "SELL", type: "LIMIT" | "STOP", price: number) => {
       if (!activeAccountId) {
-        toast.warning("No Account", "Select an account before placing orders");
+        toast.warning(translateNow("toast.noAccount"), translateNow("toast.noAccount.order"));
         return;
       }
       const input: PlaceOrderInput = {
@@ -406,6 +411,7 @@ export function TradingPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      <GuidePanel />
       {/* ── Mobile Account Bar (small screens only) ────── */}
       <div className="md:hidden">
         <MobileAccountBar
@@ -463,7 +469,10 @@ export function TradingPage() {
         {/* Chart + Bottom Panel */}
         <div className="flex flex-col flex-1 min-w-0">
           {/* Chart Area */}
-          <div className="flex-1 min-h-[200px] relative">
+          <div className="flex-1 min-h-[200px] relative flex flex-col">
+            {structureView === "multi" && !replayCandles ? (
+              <MultiTimeframeView symbol={selectedSymbol} digits={pipDigits} isDark={isDark} />
+            ) : (
             <ChartPanel
               candles={replayCandles ?? candles}
               selectedSymbol={selectedSymbol}
@@ -498,6 +507,7 @@ export function TradingPage() {
               onClearDrawings={clearDrawings}
               onClearIndicators={handleClearIndicators}
             />
+            )}
           </div>
 
           {/* Replay timeline scrubber — disabled until the feature is QA'd */}

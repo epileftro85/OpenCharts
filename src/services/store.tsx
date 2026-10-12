@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { api } from "./api.ts";
 import { wsClient } from "./ws.ts";
+import { registerSymbols } from "./paper/symbols.ts";
+import { writeWatchlist } from "./server/market.ts";
 import type { Account, Order, Position, Symbol, User } from "./schemas.ts";
 
 type LoginMfaResponse = {
@@ -309,6 +311,9 @@ interface TradingState {
   loadPositions: () => Promise<void>;
   loadOrders: () => Promise<void>;
   loadSymbols: () => Promise<void>;
+  /** Add an instrument (e.g. from symbol search) to this browser's watchlist. */
+  addToWatchlist: (symbol: Symbol) => void;
+  removeFromWatchlist: (name: string) => void;
   updateTick: (symbolName: string, bid: number, ask: number, timestamp: number) => void;
   updateLiveTick: (symbolName: string, bid: number, ask: number, timestamp: number) => void;
   updateCandleFromWs: (symbol: string, timeframe: string, bar: CandleBar) => void;
@@ -329,7 +334,7 @@ export const useTradingStore = create<TradingState>((set, get) => ({
   positions: [],
   orders: [],
   symbols: [],
-  selectedSymbol: "BTCUSD",
+  selectedSymbol: localStorage.getItem("oc_selected_symbol") ?? "",
   ticks: {},
   liveTicks: {},
   liveCandleUpdates: {},
@@ -382,8 +387,29 @@ export const useTradingStore = create<TradingState>((set, get) => ({
   },
 
   loadSymbols: async () => {
-    const symbols = await api.getSymbols();
+    const symbols = (await api.getSymbols()) as Symbol[];
     set({ symbols });
+    const selected = get().selectedSymbol;
+    if ((!selected || !symbols.some((s) => s.name === selected)) && symbols[0]) {
+      get().setSelectedSymbol(symbols[0].name);
+    }
+  },
+
+  addToWatchlist: (symbol) => {
+    registerSymbols([symbol]);
+    const symbols = get().symbols.some((s) => s.name === symbol.name)
+      ? get().symbols
+      : [...get().symbols, symbol];
+    set({ symbols });
+    writeWatchlist(symbols.map((s) => s.name));
+  },
+
+  removeFromWatchlist: (name) => {
+    const symbols = get().symbols.filter((s) => s.name !== name);
+    if (symbols.length === 0) return; // keep at least one instrument
+    set({ symbols });
+    writeWatchlist(symbols.map((s) => s.name));
+    if (get().selectedSymbol === name) get().setSelectedSymbol(symbols[0]!.name);
   },
 
   updateTick: (symbolName, bid, ask, timestamp) => {
@@ -470,12 +496,14 @@ export const useTradingStore = create<TradingState>((set, get) => ({
     }));
   },
 
-  setSelectedSymbol: (symbol) =>
+  setSelectedSymbol: (symbol) => {
+    localStorage.setItem("oc_selected_symbol", symbol);
     set((state) =>
       state.selectedSymbol === symbol
         ? { selectedSymbol: symbol }
         : { selectedSymbol: symbol, liveCandleUpdates: {} },
-    ),
+    );
+  },
   setPositions: (positions) => set({ positions }),
   setOrders: (orders) => set({ orders }),
   setReplaySessionDate: (date) => set({ replaySessionDate: date }),

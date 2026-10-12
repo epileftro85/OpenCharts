@@ -3,6 +3,7 @@ import { useState, useEffect, useSyncExternalStore } from "react";
 import { wsClient, type ConnectionState } from "@/services/ws";
 import { useMarketDataHealth } from "@/services/queries";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/index.ts";
 import { Wifi, WifiOff, Loader2 } from "lucide-react";
 
 interface MarketDataHealthSnapshot {
@@ -80,25 +81,25 @@ export function useStaleData(): boolean {
 // ── Connection Indicator Component ──────────────────────
 const stateConfig = {
   connected: {
-    label: "Connected",
+    label: "conn.connected",
     icon: Wifi,
     color: "text-success",
     dot: "bg-success",
   },
   connecting: {
-    label: "Connecting…",
+    label: "conn.connecting",
     icon: Loader2,
     color: "text-warning",
     dot: "bg-warning",
   },
   reconnecting: {
-    label: "Reconnecting…",
+    label: "conn.reconnecting",
     icon: Loader2,
     color: "text-warning",
     dot: "bg-warning",
   },
   disconnected: {
-    label: "Offline",
+    label: "conn.disconnected",
     icon: WifiOff,
     color: "text-destructive",
     dot: "bg-destructive",
@@ -107,11 +108,17 @@ const stateConfig = {
 
 export function ConnectionIndicator({ className }: { className?: string }) {
   const state = useConnectionState();
-  const { label, icon: Icon, color, dot } = stateConfig[state];
+  const t = useT();
+  const { label: labelKey, icon: Icon, color, dot } = stateConfig[state];
+  const label = t(labelKey);
   const isSpinning = state === "connecting" || state === "reconnecting";
+  const provider = wsClient.providerStatus;
+  const title = provider
+    ? `${label} · ${t("conn.provider", { provider: provider.provider, target: provider.target })}${provider.lastError ? ` — ${provider.lastError}` : ""}`
+    : label;
 
   return (
-    <div className={cn("flex items-center gap-1.5 text-[11px]", className)} title={label}>
+    <div className={cn("flex items-center gap-1.5 text-[11px]", className)} title={title}>
       <span
         className={cn("h-1.5 w-1.5 rounded-full", dot, state !== "connected" && "animate-pulse")}
       />
@@ -126,6 +133,7 @@ export function StaleDataBanner() {
   const stale = useStaleData();
   const state = useConnectionState();
   const { data: health } = useMarketDataHealth();
+  const t = useT();
   if (!stale) return null;
 
   const message = (() => {
@@ -133,29 +141,29 @@ export function StaleDataBanner() {
       const interruptionReason = health.adapter?.reason;
       if (health.adapter?.status === "unavailable") {
         return interruptionReason
-          ? `Live Feed Outage — ${interruptionReason}. Historical charts may still render from stored candles.`
-          : "Live Feed Outage — live market data is unavailable. Historical charts may still render from stored candles.";
+          ? t("conn.outageReason", { reason: interruptionReason })
+          : t("conn.outage");
       }
 
       if (typeof health.lastTickAgeMs === "number" && health.lastTickAgeMs < 0) {
-        return "Historical-Only Mode — no live ticks yet. Charts are rendering from historical data.";
+        return t("conn.historicalOnly");
       }
 
       const staleCount = typeof health.staleCount === "number" ? health.staleCount : 0;
       const totalSymbols = typeof health.totalSymbols === "number" ? health.totalSymbols : 0;
       if (totalSymbols > 0 && staleCount >= totalSymbols) {
-        return "Live Feed Degraded — symbols are stale and live updates are delayed. Historical charts remain available.";
+        return t("conn.degradedAll");
       }
       if (staleCount > 0) {
-        return "Feed Degraded — some symbols are delayed. Trading may be impacted for affected symbols.";
+        return t("conn.degradedSome");
       }
     }
 
     if (state !== "connected") {
-      return "Connection Lost — live updates are paused. Historical charts remain available.";
+      return t("conn.lost");
     }
 
-    return "Data Interruption — live market data is unavailable";
+    return t("conn.interrupted");
   })();
 
   return (
@@ -167,6 +175,7 @@ export function StaleDataBanner() {
 
 // ── Disconnected Trading Banner (inline for order panel / bottom panel) ──
 export function DisconnectedTradingBanner({ className }: { className?: string }) {
+  const t = useT();
   return (
     <div
       className={cn(
@@ -176,10 +185,10 @@ export function DisconnectedTradingBanner({ className }: { className?: string })
     >
       <div className="flex items-center justify-center gap-1.5 text-destructive text-xs font-semibold">
         <WifiOff className="h-3.5 w-3.5" />
-        Data Feed Disconnected
+        {t("conn.banner.title")}
       </div>
       <p className="text-[10px] text-muted-foreground mt-0.5">
-        Trading is disabled until the connection is restored
+        {t("conn.banner.desc")}
       </p>
     </div>
   );

@@ -129,23 +129,50 @@ toolbar and removable individually or in bulk from the chart context menu.
 
 ## Quick start
 
-> Requires **Node 20+**.
+> Requires **Node 20+**. OpenCharts now runs with a small local server
+> (`server/`) that streams **real market data** from **Alpaca** or
+> **Interactive Brokers** (or simulated data). Orders are always
+> **paper-traded in the browser** — the server is read-only and never sends
+> orders to a broker.
 
 ```bash
 npm install
-npm run dev
+cp .env.example .env   # choose DATA_PROVIDER=alpaca|ibkr|mock and add your keys
+npm run dev            # server (127.0.0.1:3000) + web (http://localhost:5173)
+npm run dev:mock       # same, with simulated data — no broker account needed
+npm test
 ```
 
-Open the printed local URL (e.g. `http://localhost:5173`). The app boots straight
-into a session with a funded paper account — pick a symbol from the watchlist,
-set a size in the order ticket, and go long or short.
+| `DATA_PROVIDER` | Needs | Instruments |
+| --- | --- | --- |
+| `alpaca` (default) | Alpaca API keys (a free paper account is enough) | US stocks/ETFs, crypto |
+| `ibkr` | IB Gateway or TWS running, API enabled, *Read-Only API* on | Stocks/ETFs, indices (`^SPX`), forex (`EUR.USD`) |
+| `mock` | Nothing | Simulated stocks, forex and crypto |
 
-To build for production:
+Symbol names: `AAPL` (stock), `EUR.USD` (forex), `BTC/USD` (crypto), `^SPX`
+(index). Search any symbol from the chart's symbol picker to add it to your
+watchlist (saved per browser).
 
-```bash
-npm run build      # outputs to dist/
-npm run preview    # serve the production build locally
-```
+Production build: `npm run build && npm start` serves the terminal and the API
+from `http://127.0.0.1:3000`.
+
+Interface in **Spanish and English** (ES/EN switch in the chart toolbar; the
+default comes from `APP_LANG` in `.env`).
+
+**Market structure for learning** (from the `market-structure` project): the
+*Structure* menu marks HH/HL/LH/LL, BOS and CHoCH on the chart (on by default)
+and adds optional FVG, order blocks, EQH/EQL, sweeps, external structure,
+higher-timeframe levels, EMA 10–200 and daily VWAP. Every item has a **?** that
+opens the bilingual **guide** (what it is, how to read it, the exact rule, what
+to practice, step-by-step examples). The *1 chart / 4 timeframes* switch opens
+a 1D · 4H · 15m · 10m view (layout 4 → 2 → 1 with the `L` key, Heikin Ashi).
+
+**Read [docs/LIMITATIONS.md](docs/LIMITATIONS.md)** before practicing: it lists
+what is simulated or approximate (paper fills, sessions, provider caveats).
+
+> The sections below still describe the original static demo and will be
+> rewritten (see the integration plan): the bundled Binance replay feed has
+> been replaced by the server.
 
 ## What's real and what's simulated
 

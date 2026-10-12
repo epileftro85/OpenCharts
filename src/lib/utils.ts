@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { dateLocale } from "../i18n/index.ts";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -22,7 +23,7 @@ export function formatNumber(value: number, decimals = 2): string {
 }
 
 export function formatDate(date: string | Date): string {
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(dateLocale(), {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -31,7 +32,7 @@ export function formatDate(date: string | Date): string {
 }
 
 export function formatDateFull(date: string | Date): string {
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(dateLocale(), {
     year: "numeric",
     month: "short",
     day: "numeric",

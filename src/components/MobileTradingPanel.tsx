@@ -7,6 +7,8 @@
 import { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useInstrumentLabels } from "../hooks/useInstrumentLabels.ts";
+import { useT } from "../i18n/index.ts";
+import { symbolDigits } from "../pages/trading/utils.ts";
 
 interface MobilePosition {
   id: string;
@@ -66,6 +68,7 @@ export function MobileTradingPanel({
   const { formatQty } = useInstrumentLabels();
   const spread = spreadProp ?? ask - bid;
   const [activeTab, setActiveTab] = useState<Tab>("order");
+  const t = useT();
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "STOP">("MARKET");
   const [quantity, setQuantity] = useState(0.1);
   const [limitPrice, setLimitPrice] = useState<string>("");
@@ -119,9 +122,9 @@ export function MobileTradingPanel({
       {/* Tab bar */}
       <div className="flex border-b border-slate-700">
         {[
-          { key: "order" as const, label: "Order" },
-          { key: "positions" as const, label: `Positions (${positions.length})` },
-          { key: "alerts" as const, label: "Alerts" },
+          { key: "order" as const, label: t("mobile.tab.order") },
+          { key: "positions" as const, label: t("mobile.tab.positions", { n: positions.length }) },
+          { key: "alerts" as const, label: t("mobile.tab.alerts") },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -151,16 +154,16 @@ export function MobileTradingPanel({
 
           {/* Order type selector */}
           <div className="flex gap-1.5">
-            {(["MARKET", "LIMIT", "STOP"] as const).map((t) => (
+            {(["MARKET", "LIMIT", "STOP"] as const).map((ot) => (
               <button
-                key={t}
-                onClick={() => setOrderType(t)}
+                key={ot}
+                onClick={() => setOrderType(ot)}
                 className={cn(
                   "flex-1 py-2 rounded-lg text-xs font-medium transition",
-                  orderType === t ? "bg-violet-600 text-white" : "bg-slate-800 text-slate-400",
+                  orderType === ot ? "bg-violet-600 text-white" : "bg-slate-800 text-slate-400",
                 )}
               >
-                {t}
+                {t(`orderType.${ot}`)}
               </button>
             ))}
           </div>
@@ -169,14 +172,14 @@ export function MobileTradingPanel({
           {orderType !== "MARKET" && (
             <div>
               <label className="text-xs text-slate-400 mb-1 block">
-                {orderType === "LIMIT" ? "Limit Price" : "Stop Price"}
+                {orderType === "LIMIT" ? t("mobile.limitPrice") : t("order.stopPrice")}
               </label>
               <input
                 type="number"
                 step="any"
                 value={limitPrice}
                 onChange={(e) => setLimitPrice(e.target.value)}
-                placeholder={bid.toFixed(5)}
+                placeholder={bid.toFixed(symbolDigits(symbol))}
                 className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm font-mono text-center focus:ring-2 focus:ring-violet-500"
               />
             </div>
@@ -185,7 +188,7 @@ export function MobileTradingPanel({
           {/* Lot size presets */}
           <div>
             <label className="text-xs text-slate-400 mb-1.5 block">
-              Lot Size: <span className="text-white font-mono">{quantity}</span>
+              {t("mobile.qty")} <span className="text-white font-mono">{quantity}</span>
             </label>
             <div className="grid grid-cols-3 min-[400px]:grid-cols-6 gap-1.5">
               {LOT_PRESETS.map((lot) => (
@@ -225,24 +228,24 @@ export function MobileTradingPanel({
           {showAdvanced && (
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs text-red-400 mb-1 block">Stop Loss</label>
+                <label className="text-xs text-red-400 mb-1 block">{t("order.stopLoss")}</label>
                 <input
                   type="number"
                   step="any"
                   value={stopLoss}
                   onChange={(e) => setStopLoss(e.target.value)}
-                  placeholder="Optional"
+                  placeholder={t("mobile.optional")}
                   className="w-full px-2 py-2 bg-slate-800 border border-red-500/30 rounded-lg text-white text-xs font-mono text-center focus:ring-2 focus:ring-red-500"
                 />
               </div>
               <div>
-                <label className="text-xs text-emerald-400 mb-1 block">Take Profit</label>
+                <label className="text-xs text-emerald-400 mb-1 block">{t("order.takeProfit")}</label>
                 <input
                   type="number"
                   step="any"
                   value={takeProfit}
                   onChange={(e) => setTakeProfit(e.target.value)}
-                  placeholder="Optional"
+                  placeholder={t("mobile.optional")}
                   className="w-full px-2 py-2 bg-slate-800 border border-emerald-500/30 rounded-lg text-white text-xs font-mono text-center focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -255,14 +258,14 @@ export function MobileTradingPanel({
               onClick={() => handleOrder("SELL")}
               className="py-4 rounded-xl bg-red-600 hover:bg-red-500 active:bg-red-700 active:scale-[0.98] text-white font-bold transition-all"
             >
-              <div className="text-lg">SELL</div>
+              <div className="text-lg">{t("side.SELL")}</div>
               <div className="text-xs font-mono opacity-80">{bid.toFixed(5)}</div>
             </button>
             <button
               onClick={() => handleOrder("BUY")}
               className="py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.98] text-white font-bold transition-all"
             >
-              <div className="text-lg">BUY</div>
+              <div className="text-lg">{t("side.BUY")}</div>
               <div className="text-xs font-mono opacity-80">{ask.toFixed(5)}</div>
             </button>
           </div>
@@ -281,7 +284,7 @@ export function MobileTradingPanel({
       {activeTab === "positions" && (
         <div className="p-3 space-y-2 max-h-[50vh] overflow-y-auto">
           {positions.length === 0 ? (
-            <div className="text-center py-8 text-slate-500 text-sm">No open positions</div>
+            <div className="text-center py-8 text-slate-500 text-sm">{t("positions.empty")}</div>
           ) : (
             <>
               {/* Total P&L bar */}
@@ -351,7 +354,7 @@ export function MobileTradingPanel({
                               : "bg-slate-700 hover:bg-red-600/40 active:bg-red-600/60 text-slate-300 hover:text-white",
                           )}
                         >
-                          {closingPositionId === pos.id ? "Closing…" : "Close"}
+                          {closingPositionId === pos.id ? t("mobile.closing") : t("positions.close")}
                         </button>
                       )}
                     </div>
@@ -371,7 +374,7 @@ export function MobileTradingPanel({
                       : "bg-red-600/20 hover:bg-red-600/30 active:bg-red-600/40 text-red-400",
                   )}
                 >
-                  {closingAll ? "Closing All…" : "Close All Positions"}
+                  {closingAll ? t("mobile.closingAll") : t("mobile.closeAll")}
                 </button>
               )}
             </>
@@ -383,9 +386,9 @@ export function MobileTradingPanel({
       {activeTab === "alerts" && (
         <div className="p-3 space-y-3">
           <div className="text-center py-8">
-            <p className="text-slate-500 text-sm">Price alerts coming soon</p>
+            <p className="text-slate-500 text-sm">{t("mobile.alertsSoon")}</p>
             <p className="text-xs text-slate-600 mt-1">
-              Set alerts for price levels and get push notifications
+              {t("mobile.alertsHint")}
             </p>
           </div>
         </div>
@@ -408,31 +411,32 @@ export function MobileAccountBar({
   margin: number;
   pnl: number;
 }) {
+  const t = useT();
   return (
     <div className="md:hidden flex items-center gap-2 px-2 py-1 bg-slate-800/80 border-b border-slate-700 overflow-x-auto no-scrollbar">
       <div className="shrink-0">
-        <div className="text-[9px] text-slate-500 uppercase">Bal</div>
+        <div className="text-[9px] text-slate-500 uppercase">{t("mobile.balance")}</div>
         <div className="text-[11px] font-mono font-bold text-white">
           ${balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
         </div>
       </div>
       <div className="w-px h-5 bg-slate-700 shrink-0" />
       <div className="shrink-0">
-        <div className="text-[9px] text-slate-500 uppercase">Equity</div>
+        <div className="text-[9px] text-slate-500 uppercase">{t("mobile.equity")}</div>
         <div className="text-[11px] font-mono font-bold text-white">
           ${equity.toLocaleString(undefined, { maximumFractionDigits: 0 })}
         </div>
       </div>
       <div className="w-px h-5 bg-slate-700 shrink-0" />
       <div className="shrink-0">
-        <div className="text-[9px] text-slate-500 uppercase">Margin</div>
+        <div className="text-[9px] text-slate-500 uppercase">{t("mobile.margin")}</div>
         <div className="text-[11px] font-mono font-bold text-slate-300">
           ${margin.toLocaleString(undefined, { maximumFractionDigits: 0 })}
         </div>
       </div>
       <div className="w-px h-5 bg-slate-700 shrink-0" />
       <div className="shrink-0">
-        <div className="text-[9px] text-slate-500 uppercase">P&L</div>
+        <div className="text-[9px] text-slate-500 uppercase">{t("col.pnl")}</div>
         <div
           className={cn(
             "text-[11px] font-mono font-bold",

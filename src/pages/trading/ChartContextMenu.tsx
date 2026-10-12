@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils.ts";
+import { useT } from "../../i18n/index.ts";
 
 // ── Chart context menu (TradingView-style right-click menu) ──────────────────
 // Rendered by ChartPanel at the cursor position when the user right-clicks
@@ -89,13 +90,14 @@ function TradeSection({
   ChartContextMenuProps,
   "pipDigits" | "symbol" | "tick" | "onQuickOrder" | "onAddAlert" | "onClose"
 > & { price: number }) {
+  const t = useT();
   const p = price.toFixed(pipDigits);
   return (
     <>
       {onAddAlert && (
         <MenuItem
           icon={<Bell className="h-3.5 w-3.5" />}
-          label={`Add alert on ${symbol} at ${p}`}
+          label={t("ctx.alert", { symbol, price: p })}
           onClick={() => {
             onAddAlert(price);
             onClose();
@@ -106,7 +108,7 @@ function TradeSection({
         <>
           <MenuItem
             icon={<ArrowUpFromLine className="h-3.5 w-3.5" />}
-            label={`Buy 1 ${symbol} @ ${p} ${buyOrderType(price, tick.ask).toLowerCase()}`}
+            label={t("ctx.buy", { symbol, price: p, type: t(`orderType.${buyOrderType(price, tick.ask)}`).toLowerCase() })}
             onClick={() => {
               onQuickOrder("BUY", buyOrderType(price, tick.ask), price);
               onClose();
@@ -114,7 +116,7 @@ function TradeSection({
           />
           <MenuItem
             icon={<ArrowDownToLine className="h-3.5 w-3.5" />}
-            label={`Sell 1 ${symbol} @ ${p} ${sellOrderType(price, tick.bid).toLowerCase()}`}
+            label={t("ctx.sell", { symbol, price: p, type: t(`orderType.${sellOrderType(price, tick.bid)}`).toLowerCase() })}
             onClick={() => {
               onQuickOrder("SELL", sellOrderType(price, tick.bid), price);
               onClose();
@@ -143,6 +145,7 @@ export function ChartContextMenu(props: ChartContextMenuProps) {
     onOpenSettings,
   } = props;
 
+  const t = useT();
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x, y });
 
@@ -183,7 +186,7 @@ export function ChartContextMenu(props: ChartContextMenuProps) {
       >
         <MenuItem
           icon={<RotateCcw className="h-3.5 w-3.5" />}
-          label="Reset chart view"
+          label={t("ctx.reset")}
           onClick={() => {
             onResetView();
             onClose();
@@ -194,7 +197,7 @@ export function ChartContextMenu(props: ChartContextMenuProps) {
             <Separator />
             <MenuItem
               icon={<ClipboardCopy className="h-3.5 w-3.5" />}
-              label={`Copy price ${price.toFixed(pipDigits)}`}
+              label={t("ctx.copy", { price: price.toFixed(pipDigits) })}
               onClick={() => {
                 onCopyPrice(price);
                 onClose();
@@ -207,7 +210,7 @@ export function ChartContextMenu(props: ChartContextMenuProps) {
         <Separator />
         <MenuItem
           icon={<ListTree className="h-3.5 w-3.5" />}
-          label="Object tree"
+          label={t("ctx.tree")}
           onClick={() => {
             onOpenObjectTree();
             onClose();
@@ -217,7 +220,7 @@ export function ChartContextMenu(props: ChartContextMenuProps) {
         {drawingsCount > 0 && onRemoveAllDrawings && (
           <MenuItem
             icon={<Trash2 className="h-3.5 w-3.5" />}
-            label={`Remove ${drawingsCount} drawing${drawingsCount === 1 ? "" : "s"}`}
+            label={t("ctx.removeDrawings", { n: drawingsCount })}
             danger
             onClick={() => {
               onRemoveAllDrawings();
@@ -228,7 +231,7 @@ export function ChartContextMenu(props: ChartContextMenuProps) {
         {indicatorsCount > 0 && onClearIndicators && (
           <MenuItem
             icon={<Trash2 className="h-3.5 w-3.5" />}
-            label={`Remove ${indicatorsCount} indicator${indicatorsCount === 1 ? "" : "s"}`}
+            label={t("ctx.removeIndicators", { n: indicatorsCount })}
             danger
             onClick={() => {
               onClearIndicators();
@@ -239,7 +242,7 @@ export function ChartContextMenu(props: ChartContextMenuProps) {
         <Separator />
         <MenuItem
           icon={<Settings className="h-3.5 w-3.5" />}
-          label="Chart Settings…"
+          label={t("ctx.settings")}
           onClick={() => {
             onOpenSettings();
             onClose();

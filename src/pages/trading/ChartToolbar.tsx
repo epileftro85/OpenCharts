@@ -51,6 +51,51 @@ import {
 import { ChartTemplatesMenu } from "./ChartTemplatesMenu.tsx";
 import { ReplayHUD } from "./ReplayHUD.tsx";
 import { getPipDigits } from "./utils.ts";
+import { useT } from "../../i18n/index.ts";
+import { LangSwitch } from "../../i18n/LangSwitch.tsx";
+import { StructureMenu, ViewSwitch } from "../../components/structure/StructureMenu.tsx";
+import { useTradingStore } from "../../services/store.tsx";
+import { searchSymbols, type MarketSymbol } from "../../services/server/market.ts";
+import type { Symbol } from "../../services/schemas.ts";
+
+type SearchItem = {
+  id?: string;
+  name: string;
+  displayName?: string | null;
+  assetClass?: string;
+  category?: string;
+  exchange?: string;
+  /** Found at the data provider, not yet in the watchlist. */
+  remote?: MarketSymbol;
+};
+
+/** Provider-side symbol search (debounced). Empty while the query is blank. */
+function useProviderSearch(query: string): { results: MarketSymbol[]; loading: boolean; error: string | null } {
+  const [state, setState] = useState<{ results: MarketSymbol[]; loading: boolean; error: string | null }>({
+    results: [],
+    loading: false,
+    error: null,
+  });
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setState({ results: [], loading: false, error: null });
+      return;
+    }
+    let cancelled = false;
+    setState((s) => ({ ...s, loading: true }));
+    const timer = setTimeout(() => {
+      searchSymbols(q)
+        .then((results) => !cancelled && setState({ results, loading: false, error: null }))
+        .catch((e: Error) => !cancelled && setState({ results: [], loading: false, error: e.message }));
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
+  return state;
+}
 
 export interface ChartToolbarProps {
   selectedSymbol: string;
@@ -139,14 +184,35 @@ export function ChartToolbar({
   stayInDrawingMode = false,
   onToggleStayInDrawingMode,
 }: ChartToolbarProps) {
+  const t = useT();
   const [showSymbolSearch, setShowSymbolSearch] = useState(false);
   const [symbolFilter, setSymbolFilter] = useState("");
 
-  const filteredSymbols = symbols.filter(
+  const addToWatchlist = useTradingStore((s) => s.addToWatchlist);
+  const providerSearch = useProviderSearch(showSymbolSearch ? symbolFilter : "");
+  const localMatches: SearchItem[] = symbols.filter(
     (s) =>
       s.name.toLowerCase().includes(symbolFilter.toLowerCase()) ||
-      (s.category || "").toLowerCase().includes(symbolFilter.toLowerCase()),
+      (s.category || "").toLowerCase().includes(symbolFilter.toLowerCase()) ||
+      (s.displayName || "").toLowerCase().includes(symbolFilter.toLowerCase()),
   );
+  const filteredSymbols: SearchItem[] = [
+    ...localMatches,
+    ...providerSearch.results
+      .filter((r) => !symbols.some((s) => s.name === r.name))
+      .map((r) => ({ ...r, remote: r })),
+  ];
+  const pickSymbol = (s: SearchItem) => {
+    if (s.remote) addToWatchlist(s.remote as Symbol);
+    onSymbolChange(s.name);
+    setShowSymbolSearch(false);
+    setSymbolFilter("");
+  };
+  const searchStatus = providerSearch.loading
+    ? t("search.searching")
+    : providerSearch.error
+      ? providerSearch.error
+      : null;
 
   // Spread in pips/points: (ask - bid) / pipSize. Previously this multiplied
   // by contractSize which produced a meaningless quote-currency-per-lot number
@@ -182,7 +248,7 @@ export function ChartToolbar({
                   <Search className="h-4 w-4 text-muted-foreground shrink-0" />
                   <input
                     autoFocus
-                    placeholder="Search symbols..."
+                    placeholder={t("search.placeholder")}
                     value={symbolFilter}
                     onChange={(e) => setSymbolFilter(e.target.value)}
                     className="flex-1 bg-transparent text-base outline-none"
@@ -198,19 +264,18 @@ export function ChartToolbar({
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto overscroll-contain">
+                  {searchStatus && (
+                    <div className="px-4 py-2 text-xs text-muted-foreground">{searchStatus}</div>
+                  )}
                   {filteredSymbols.length === 0 ? (
                     <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      No symbols match &ldquo;{symbolFilter}&rdquo;
+                      {t("search.none", { q: symbolFilter })}
                     </div>
                   ) : (
                     filteredSymbols.map((s) => (
                       <button
                         key={s.id || s.name}
-                        onClick={() => {
-                          onSymbolChange(s.name);
-                          setShowSymbolSearch(false);
-                          setSymbolFilter("");
-                        }}
+                        onClick={() => pickSymbol(s)}
                         className={cn(
                           "w-full flex items-center justify-between px-4 py-3 text-base hover:bg-secondary border-b border-border/40 active:bg-secondary",
                           s.name === selectedSymbol && "bg-secondary",
@@ -223,7 +288,8 @@ export function ChartToolbar({
                           )}
                         </div>
                         <span className="text-muted-foreground text-xs uppercase tracking-wide">
-                          {s.category || s.assetClass}
+                          {s.remote ? "+ " : ""}
+                          {s.category ? t(`cat.${s.category}`) : s.assetClass}
                         </span>
                       </button>
                     ))
@@ -233,30 +299,38 @@ export function ChartToolbar({
             </div>
 
             {/* Desktop: absolute dropdown */}
-            <div className="hidden md:block absolute top-full left-0 z-50 mt-1 w-64 bg-card border border-border rounded-lg shadow-xl overflow-hidden">
+            <div className="hidden md:block absolute top-full left-0 z-50 mt-1 w-80 bg-card border border-border rounded-lg shadow-xl overflow-hidden">
               <input
                 autoFocus
-                placeholder="Search symbols..."
+                placeholder={t("search.placeholder")}
                 value={symbolFilter}
                 onChange={(e) => setSymbolFilter(e.target.value)}
                 className="w-full px-3 py-2 text-sm border-b border-border bg-card"
               />
-              <div className="max-h-60 overflow-y-auto">
+              {searchStatus && (
+                <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border">{searchStatus}</div>
+              )}
+              <div className="max-h-80 overflow-y-auto">
                 {filteredSymbols.map((s) => (
                   <button
                     key={s.id || s.name}
-                    onClick={() => {
-                      onSymbolChange(s.name);
-                      setShowSymbolSearch(false);
-                      setSymbolFilter("");
-                    }}
+                    onClick={() => pickSymbol(s)}
+                    title={s.remote ? t("search.addAndOpen") : undefined}
                     className={cn(
-                      "w-full flex items-center justify-between px-3 py-1.5 text-sm hover:bg-secondary",
+                      "w-full flex items-center justify-between gap-2 px-3 py-1.5 text-sm hover:bg-secondary",
                       s.name === selectedSymbol && "bg-secondary",
                     )}
                   >
-                    <span className="font-medium">{s.name}</span>
-                    <span className="text-muted-foreground text-xs">{s.category}</span>
+                    <span className="flex min-w-0 flex-col items-start">
+                      <span className="font-medium">{s.name}</span>
+                      {s.displayName && s.displayName !== s.name && (
+                        <span className="w-full truncate text-left text-[10px] text-muted-foreground">{s.displayName}</span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-muted-foreground text-xs">
+                      {s.remote ? "+ " : ""}
+                      {s.category ? t(`cat.${s.category}`) : ""}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -282,7 +356,7 @@ export function ChartToolbar({
             )}
           </span>
           <span className="text-muted-foreground text-[10px] font-medium ml-0.5 hidden md:inline">
-            Sprd: {spread}
+            {t("toolbar.spread", { v: spread })}
           </span>
         </div>
       )}
@@ -294,7 +368,7 @@ export function ChartToolbar({
             key={tf}
             onClick={() => onTimeframeChange(tf)}
             disabled={isReplaying}
-            title={isReplaying ? "Timeframe is fixed to 1m during replay" : undefined}
+            title={isReplaying ? t("toolbar.tfLocked") : undefined}
             className={cn(
               "px-2 py-1 rounded-md text-xs font-medium transition-all",
               tf === timeframe
@@ -336,7 +410,7 @@ export function ChartToolbar({
             )}
           >
             <BarChart3 className="h-3 w-3" />
-            Indicators
+            {t("toolbar.indicators")}
             {activeIndicators.length > 0 && (
               <span className="bg-primary text-primary-foreground rounded-full px-1 text-[9px]">
                 {activeIndicators.length}
@@ -359,14 +433,18 @@ export function ChartToolbar({
                     className="w-2 h-2 rounded-full shrink-0"
                     style={{ backgroundColor: ind.color }}
                   />
-                  <span className="flex-1">{ind.label}</span>
-                  <span className="text-[10px] text-muted-foreground">{ind.pane}</span>
+                  <span className="flex-1">{t(`ind.${ind.type}`)}</span>
+                  <span className="text-[10px] text-muted-foreground">{t(`ind.pane.${ind.pane}`)}</span>
                 </button>
               ))}
             </div>
           )}
         </div>
       }
+
+      {/* Market structure (HH/HL/LH/LL, BOS/CHoCH, zones, liquidity…) + single / 4-timeframe view */}
+      <StructureMenu timeframe={timeframe} />
+      <ViewSwitch />
 
       {/* Drawing Tools — pencil icon with dropdown */}
       {
@@ -389,42 +467,44 @@ export function ChartToolbar({
 
       <div className="flex-1 hidden md:block" />
 
+      <LangSwitch className="shrink-0 mx-1" />
+
       {/* Right Panel Toggles */}
       <div className="hidden md:flex items-center gap-0.5">
         <ToolButton
           icon={ArrowUpDown}
-          tooltip="Order Panel"
+          tooltip={t("panel.order")}
           active={showRightPanel && rightPanel === "order"}
           onClick={() => onRightPanel("order")}
         />
         <ToolButton
           icon={Layers}
-          tooltip="Depth of Market"
+          tooltip={t("panel.dom")}
           active={showRightPanel && rightPanel === "dom"}
           onClick={() => onRightPanel("dom")}
         />
         <ToolButton
           icon={BarChart3}
-          tooltip="Watchlist"
+          tooltip={t("panel.watchlist")}
           active={showRightPanel && rightPanel === "watchlist"}
           onClick={() => onRightPanel("watchlist")}
         />
         <ToolButton
           icon={Newspaper}
-          tooltip="News"
+          tooltip={t("panel.news")}
           active={showRightPanel && rightPanel === "news"}
           onClick={() => onRightPanel("news")}
         />
         <ToolButton
           icon={Star}
-          tooltip="TradingView Analysis"
+          tooltip={t("panel.tvAnalysis")}
           active={showRightPanel && rightPanel === "tv-analysis"}
           onClick={() => onRightPanel("tv-analysis")}
         />
         {aiTraderEnabled && (
           <ToolButton
             icon={Bot}
-            tooltip="AI Trader"
+            tooltip={t("panel.aiTrader")}
             active={showRightPanel && rightPanel === "ai-trader"}
             onClick={() => onRightPanel("ai-trader")}
           />
@@ -432,6 +512,7 @@ export function ChartToolbar({
         <div className="h-4 border-l border-border mx-1" />
         <button
           onClick={onToggleRightPanel}
+          title={t("toolbar.togglePanel")}
           className="px-1.5 py-1 rounded hover:bg-secondary text-muted-foreground"
         >
           <Maximize2 className="h-3 w-3" />
@@ -482,6 +563,7 @@ function PluginsDropdown({
   activePlugins: string[];
   onTogglePlugin: (id: string) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -502,7 +584,7 @@ function PluginsDropdown({
     <div ref={containerRef} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        title="Chart Plugins"
+        title={t("plugins.title")}
         className={cn(
           "flex items-center gap-1 px-1.5 py-1 rounded",
           isActive ? "bg-primary/20 text-primary" : "hover:bg-secondary text-muted-foreground",
@@ -518,7 +600,7 @@ function PluginsDropdown({
 
       {open && (
         <div className="absolute top-full left-0 z-50 mt-1 bg-card border border-border rounded-lg shadow-xl py-1 min-w-[190px]">
-          {CHART_PLUGIN_ITEMS.map(({ id, icon: Icon, label }) => {
+          {CHART_PLUGIN_ITEMS.map(({ id, icon: Icon }) => {
             const isOn = activePlugins.includes(id);
             return (
               <button
@@ -530,8 +612,8 @@ function PluginsDropdown({
                 )}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" />
-                <span className="flex-1">{label}</span>
-                {isOn && <span className="text-[10px] text-primary font-medium">ON</span>}
+                <span className="flex-1">{t(`plugin.${id}`)}</span>
+                {isOn && <span className="text-[10px] text-primary font-medium">{t("common.on")}</span>}
               </button>
             );
           })}
@@ -565,11 +647,13 @@ function DrawingOptionToggle({
   label,
   enabled,
   onToggle,
+  onLabel,
 }: {
   icon: LucideIcon;
   label: string;
   enabled: boolean;
   onToggle?: () => void;
+  onLabel: string;
 }) {
   if (!onToggle) return null;
   return (
@@ -583,7 +667,7 @@ function DrawingOptionToggle({
     >
       <Icon className="h-3.5 w-3.5 shrink-0" />
       <span className="flex-1">{label}</span>
-      {enabled && <span className="text-[10px] text-primary font-medium">ON</span>}
+      {enabled && <span className="text-[10px] text-primary font-medium">{onLabel}</span>}
     </button>
   );
 }
@@ -607,6 +691,7 @@ function DrawingToolsDropdown({
   stayInDrawingMode: boolean;
   onToggleStayInDrawingMode?: () => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -637,7 +722,7 @@ function DrawingToolsDropdown({
     <div ref={containerRef} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        title="Drawing Tools"
+        title={t("draw.title")}
         className={cn(
           "px-1.5 py-1 rounded",
           isActive ? "bg-primary/20 text-primary" : "hover:bg-secondary text-muted-foreground",
@@ -648,7 +733,7 @@ function DrawingToolsDropdown({
 
       {open && (
         <div className="absolute top-full left-0 z-50 mt-1 bg-card border border-border rounded-lg shadow-xl py-1 min-w-[190px]">
-          {DRAWING_TOOLS.map(({ tool, icon: Icon, label, shortcut }) => (
+          {DRAWING_TOOLS.map(({ tool, icon: Icon, shortcut }) => (
             <button
               key={tool}
               onClick={() => handleSelect(tool)}
@@ -658,7 +743,7 @@ function DrawingToolsDropdown({
               )}
             >
               <Icon className="h-3.5 w-3.5 shrink-0" />
-              <span className="flex-1">{label}</span>
+              <span className="flex-1">{t(`tool.${tool}`)}</span>
               <span className="text-[10px] text-muted-foreground/60">{shortcut}</span>
             </button>
           ))}
@@ -668,17 +753,19 @@ function DrawingToolsDropdown({
             icon={Magnet}
             label={
               magnetMode === "strong"
-                ? "Magnet: strong"
+                ? t("draw.magnetStrong")
                 : magnetMode === "weak"
-                  ? "Magnet: weak"
-                  : "Magnet: off"
+                  ? t("draw.magnetWeak")
+                  : t("draw.magnetOff")
             }
+            onLabel={t("common.on")}
             enabled={magnetMode !== "none"}
             onToggle={onCycleMagnet}
           />
           <DrawingOptionToggle
             icon={Repeat}
-            label="Stay in drawing mode"
+            label={t("draw.stayInMode")}
+            onLabel={t("common.on")}
             enabled={stayInDrawingMode}
             onToggle={onToggleStayInDrawingMode}
           />
@@ -691,7 +778,7 @@ function DrawingToolsDropdown({
                 className="w-full flex items-center gap-2.5 px-3 py-1.5 text-sm hover:bg-secondary text-muted-foreground text-left"
               >
                 <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                Clear All
+                {t("draw.clearAll")}
               </button>
             </>
           )}

@@ -4,6 +4,9 @@ import { toast } from "../../services/toast";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useInstrumentLabels } from "../../hooks/useInstrumentLabels.ts";
+import { useT } from "../../i18n/index.ts";
+import { symbolDigits } from "../../pages/trading/utils.ts";
+import { getSymbolSpec } from "../../services/paper/symbols.ts";
 import {
   X,
   TrendingUp,
@@ -45,7 +48,8 @@ export function PositionModifyDialog({
   tick,
   isFeedConnected = true,
 }: PositionModifyDialogProps) {
-  const { formatQty, unitLabel, isFutures, instrumentType } = useInstrumentLabels();
+  const { formatQty, unitLabel, isFutures } = useInstrumentLabels();
+  const t = useT();
   const [tp, setTp] = useState("");
   const [sl, setSl] = useState("");
   const [partialQty, setPartialQty] = useState("");
@@ -78,7 +82,7 @@ export function PositionModifyDialog({
 
   const handleModify = async () => {
     if (!isFeedConnected) {
-      toast.error("No Data Feed", "Cannot modify positions while disconnected from the data feed");
+      toast.error(t("toast.noFeed"), t("toast.noFeed.modify"));
       return;
     }
     const mods: { takeProfit?: number | null; stopLoss?: number | null } = {};
@@ -95,24 +99,21 @@ export function PositionModifyDialog({
       mods.stopLoss = parseFloat(sl);
     }
     if (Object.keys(mods).length === 0) {
-      toast.info("No Changes", "No modifications to apply");
+      toast.info(t("toast.noChanges"), t("toast.noChanges.desc"));
       return;
     }
     setSaving(true);
     try {
       await api.modifyPosition(position.id, mods);
-      toast.success("Position Modified", "TP/SL updated successfully");
+      toast.success(t("toast.positionModified"), t("toast.positionModified.desc"));
       onSaved();
       onClose();
     } catch (err: unknown) {
       const e = err as { code?: string; message?: string };
       if (e?.code === "REQUEST_TIMEOUT") {
-        toast.error(
-          "Request Timed Out",
-          "The server didn't respond in time. Check your connection and try again.",
-        );
+        toast.error(t("toast.timeout"), t("toast.orderTimeout.desc"));
       } else {
-        toast.error("Modify Failed", e.message || "Could not modify position");
+        toast.error(t("toast.modifyFailed"), e.message || t("toast.modifyFailed.desc"));
       }
     } finally {
       setSaving(false);
@@ -121,29 +122,26 @@ export function PositionModifyDialog({
 
   const handlePartialClose = async () => {
     if (!isFeedConnected) {
-      toast.error("No Data Feed", "Cannot close positions while disconnected from the data feed");
+      toast.error(t("toast.noFeed"), t("toast.noFeed.close"));
       return;
     }
     const qty = parseFloat(partialQty);
     if (isNaN(qty) || qty <= 0 || qty > position.quantity) {
-      toast.warning("Invalid Quantity", `Enter a value between 0.01 and ${position.quantity}`);
+      toast.warning(t("toast.invalidQty"), t("toast.invalidQty.range", { max: position.quantity }));
       return;
     }
     setSaving(true);
     try {
       await api.closePosition(position.id, qty);
-      toast.success("Partial Close", `Closed ${formatQty(qty)} of ${formatQty(position.quantity)}`);
+      toast.success(t("toast.partialClose"), t("toast.partialClose.of", { qty: formatQty(qty), total: formatQty(position.quantity) }));
       onSaved();
       onClose();
     } catch (err: unknown) {
       const e = err as { code?: string; message?: string };
       if (e?.code === "REQUEST_TIMEOUT") {
-        toast.error(
-          "Request Timed Out",
-          "The server didn't respond in time. Check your connection and try again.",
-        );
+        toast.error(t("toast.timeout"), t("toast.orderTimeout.desc"));
       } else {
-        toast.error("Close Failed", e.message || "Could not partially close position");
+        toast.error(t("toast.closeFailed"), e.message || t("toast.partialCloseFailed.desc"));
       }
     } finally {
       setSaving(false);
@@ -152,7 +150,7 @@ export function PositionModifyDialog({
 
   const handleSetBreakeven = () => {
     setSl(String(position.entryPrice));
-    toast.info("Breakeven", "Stop Loss set to entry price — click Save to apply");
+    toast.info(t("toast.breakeven"), t("toast.breakeven.desc"));
   };
 
   // Risk/reward calculation
@@ -164,7 +162,11 @@ export function PositionModifyDialog({
       : null;
 
   // Estimated P&L at TP/SL — use per-instrument contractSize if available.
-  const contractSize = position.contractSize ?? 100000;
+  const contractSize = position.contractSize ?? 1;
+  const digits = symbolDigits(position.symbolName);
+  const spec = getSymbolSpec(position.symbolName);
+  const isForex = spec?.category === "FOREX";
+  const pipFactor = position.symbolName.includes("JPY") ? 100 : 10000;
   const tpPnl = !isNaN(tpVal)
     ? (position.side === "LONG" ? tpVal - position.entryPrice : position.entryPrice - tpVal) *
       position.quantity *
@@ -197,9 +199,9 @@ export function PositionModifyDialog({
                 )}
               </div>
               <div>
-                <h3 className="text-sm font-semibold">Modify {position.symbolName}</h3>
+                <h3 className="text-sm font-semibold">{t("modify.title", { symbol: position.symbolName })}</h3>
                 <p className="text-[10px] text-muted-foreground">
-                  {position.side} {position.quantity} @ {formatNumber(position.entryPrice, 5)}
+                  {t(`side.${position.side}`)} {position.quantity} @ {formatNumber(position.entryPrice, digits)}
                 </p>
               </div>
             </div>
@@ -211,11 +213,11 @@ export function PositionModifyDialog({
           {/* Current Status */}
           <div className="px-5 py-3 grid grid-cols-3 gap-3 border-b border-border/40 text-center">
             <div>
-              <div className="text-[10px] text-muted-foreground">Current</div>
-              <div className="text-sm font-mono font-semibold">{formatNumber(currentPrice, 5)}</div>
+              <div className="text-[10px] text-muted-foreground">{t("modify.current")}</div>
+              <div className="text-sm font-mono font-semibold">{formatNumber(currentPrice, digits)}</div>
             </div>
             <div>
-              <div className="text-[10px] text-muted-foreground">P&L</div>
+              <div className="text-[10px] text-muted-foreground">{t("modify.pnl")}</div>
               <div
                 className={cn(
                   "text-sm font-mono font-semibold",
@@ -226,16 +228,16 @@ export function PositionModifyDialog({
                 {formatCurrency(position.unrealizedPnl || 0)}
               </div>
             </div>
-            {instrumentType === "FOREX" && (
+            {isForex && (
               <div>
-                <div className="text-[10px] text-muted-foreground">Pips</div>
+                <div className="text-[10px] text-muted-foreground">{t("modify.pips")}</div>
                 <div
                   className={cn(
                     "text-sm font-mono font-semibold",
                     pnlPerUnit >= 0 ? "text-buy" : "text-sell",
                   )}
                 >
-                  {(pnlPerUnit * 10000).toFixed(1)}
+                  {(pnlPerUnit * pipFactor).toFixed(1)}
                 </div>
               </div>
             )}
@@ -246,10 +248,10 @@ export function PositionModifyDialog({
             <div className="mx-5 mt-3 bg-destructive/10 border border-destructive/30 rounded px-3 py-2 text-center">
               <div className="flex items-center justify-center gap-1.5 text-destructive text-xs font-semibold">
                 <WifiOff className="h-3.5 w-3.5" />
-                Data Feed Disconnected
+                {t("conn.banner.title")}
               </div>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Modifications disabled until connection is restored
+                {t("modify.disabled")}
               </p>
             </div>
           )}
@@ -265,7 +267,7 @@ export function PositionModifyDialog({
               )}
               onClick={() => setActiveTab("modify")}
             >
-              <SlidersHorizontal className="h-3 w-3 inline mr-1" /> Modify TP/SL
+              <SlidersHorizontal className="h-3 w-3 inline mr-1" /> {t("modify.tab.modify")}
             </button>
             <button
               className={cn(
@@ -276,7 +278,7 @@ export function PositionModifyDialog({
               )}
               onClick={() => setActiveTab("partial")}
             >
-              <ArrowLeftRight className="h-3 w-3 inline mr-1" /> Partial Close
+              <ArrowLeftRight className="h-3 w-3 inline mr-1" /> {t("modify.tab.partial")}
             </button>
           </div>
 
@@ -288,7 +290,7 @@ export function PositionModifyDialog({
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                      <Target className="h-3 w-3 text-buy" /> Take Profit
+                      <Target className="h-3 w-3 text-buy" /> {t("order.takeProfit")}
                     </label>
                     {tpPnl !== null && (
                       <span
@@ -297,7 +299,7 @@ export function PositionModifyDialog({
                           tpPnl >= 0 ? "text-buy" : "text-sell",
                         )}
                       >
-                        Est: {tpPnl >= 0 ? "+" : ""}
+                        {t("modify.est")} {tpPnl >= 0 ? "+" : ""}
                         {formatCurrency(tpPnl)}
                       </span>
                     )}
@@ -306,7 +308,7 @@ export function PositionModifyDialog({
                     type="number"
                     value={tp}
                     onChange={(e) => setTp(e.target.value)}
-                    placeholder={position.takeProfit ? String(position.takeProfit) : "Not set"}
+                    placeholder={position.takeProfit ? String(position.takeProfit) : t("modify.notSet")}
                     className="w-full text-sm font-mono"
                     step="0.00001"
                   />
@@ -317,7 +319,7 @@ export function PositionModifyDialog({
                       className="text-[10px] h-5 mt-1 text-muted-foreground"
                       onClick={() => setTp("")}
                     >
-                      Remove TP
+                      {t("modify.removeTp")}
                     </Button>
                   )}
                 </div>
@@ -326,7 +328,7 @@ export function PositionModifyDialog({
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                      <Shield className="h-3 w-3 text-sell" /> Stop Loss
+                      <Shield className="h-3 w-3 text-sell" /> {t("order.stopLoss")}
                     </label>
                     {slPnl !== null && (
                       <span
@@ -335,7 +337,7 @@ export function PositionModifyDialog({
                           slPnl >= 0 ? "text-buy" : "text-sell",
                         )}
                       >
-                        Est: {slPnl >= 0 ? "+" : ""}
+                        {t("modify.est")} {slPnl >= 0 ? "+" : ""}
                         {formatCurrency(slPnl)}
                       </span>
                     )}
@@ -344,7 +346,7 @@ export function PositionModifyDialog({
                     type="number"
                     value={sl}
                     onChange={(e) => setSl(e.target.value)}
-                    placeholder={position.stopLoss ? String(position.stopLoss) : "Not set"}
+                    placeholder={position.stopLoss ? String(position.stopLoss) : t("modify.notSet")}
                     className="w-full text-sm font-mono"
                     step="0.00001"
                   />
@@ -355,7 +357,7 @@ export function PositionModifyDialog({
                       className="text-[10px] h-5 text-muted-foreground"
                       onClick={handleSetBreakeven}
                     >
-                      Breakeven ({formatNumber(position.entryPrice, 5)})
+                      {t("modify.breakeven", { price: formatNumber(position.entryPrice, digits) })}
                     </Button>
                     {sl && (
                       <Button
@@ -364,7 +366,7 @@ export function PositionModifyDialog({
                         className="text-[10px] h-5 text-muted-foreground"
                         onClick={() => setSl("")}
                       >
-                        Remove SL
+                        {t("modify.removeSl")}
                       </Button>
                     )}
                   </div>
@@ -373,7 +375,7 @@ export function PositionModifyDialog({
                 {/* Risk/Reward */}
                 {riskReward !== null && (
                   <div className="bg-secondary/50 rounded-lg p-2 text-center">
-                    <span className="text-[10px] text-muted-foreground">Risk:Reward</span>
+                    <span className="text-[10px] text-muted-foreground">{t("modify.rr")}</span>
                     <span
                       className={cn(
                         "text-sm font-mono font-semibold ml-2",
@@ -395,7 +397,7 @@ export function PositionModifyDialog({
                   disabled={saving || !isFeedConnected}
                   loading={saving}
                 >
-                  {saving ? "Saving..." : !isFeedConnected ? "Disconnected" : "Save Changes"}
+                  {saving ? t("modify.saving") : !isFeedConnected ? t("modify.disconnected") : t("modify.save")}
                 </Button>
               </>
             )}
@@ -404,13 +406,13 @@ export function PositionModifyDialog({
               <>
                 <div>
                   <label className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                    Close Volume ({unitLabel})
+                    {t("modify.closeVolume", { unit: unitLabel })}
                   </label>
                   <input
                     type="number"
                     value={partialQty}
                     onChange={(e) => setPartialQty(e.target.value)}
-                    placeholder={`Max: ${position.quantity}`}
+                    placeholder={t("modify.max", { qty: position.quantity })}
                     className="w-full mt-1 text-sm font-mono"
                     step={isFutures ? "1" : "0.01"}
                     min={isFutures ? "1" : "0.01"}
@@ -454,10 +456,10 @@ export function PositionModifyDialog({
                   loading={saving}
                 >
                   {saving
-                    ? "Closing..."
+                    ? t("modify.closing")
                     : !isFeedConnected
-                      ? "Disconnected"
-                      : `Close ${partialQty || "?"} ${unitLabel}`}
+                      ? t("modify.disconnected")
+                      : t("modify.closeBtn", { qty: partialQty || "?", unit: unitLabel })}
                 </Button>
               </>
             )}

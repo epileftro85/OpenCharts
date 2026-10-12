@@ -1,14 +1,12 @@
 import type { DrawingLine } from "../../pages/trading/constants.ts";
-import type { Candle } from "../schemas.ts";
-import { getHistory } from "./candles.ts";
+import * as market from "../server/market.ts";
 import * as engine from "./engine.ts";
-import { DEMO_SYMBOLS } from "./instruments.ts";
 
 /**
- * Demo-mode API. Replaces the HTTP client for everything the terminal needs:
- * trading actions hit the in-browser paper engine, market data comes from the
- * bundled real OHLC, and chart drawings persist to localStorage. Methods not
- * implemented here fall through to a benign stub (see services/api.ts).
+ * Terminal API. Market data comes from the local server (real Alpaca / IBKR
+ * data, or the mock provider); trading actions hit the in-browser paper engine
+ * (nothing is ever sent to a broker); chart drawings persist to localStorage.
+ * Methods not implemented here fall through to a benign stub (see services/api.ts).
  */
 
 const DEMO_USER = {
@@ -48,8 +46,12 @@ const chartDrawings = {
     return Promise.resolve({ saved: true });
   },
   remove: (drawingId: string) => {
-    for (const s of DEMO_SYMBOLS) {
-      writeDrawings(s.name, readDrawings(s.name).filter((d) => d.id !== drawingId));
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith("oc_drawings_")) continue;
+      const symbol = key.slice("oc_drawings_".length);
+      const list = readDrawings(symbol);
+      if (list.some((d) => d.id === drawingId)) writeDrawings(symbol, list.filter((d) => d.id !== drawingId));
     }
     return Promise.resolve({ deleted: true });
   },
@@ -59,12 +61,7 @@ const chartDrawings = {
   },
 };
 
-const candlesMeta = (candles: Candle[]) => ({
-  candles,
-  metadata: { isPartial: false, backfillQueued: false, historicalCoverageStart: null },
-});
-
-export const demoApi = {
+export const paperApi = {
   // ── Auth (no real auth in demo) ──
   login: () => Promise.resolve(authResponse()),
   demoLogin: () => Promise.resolve(authResponse()),
@@ -128,20 +125,19 @@ export const demoApi = {
   },
 
   // ── Symbols & market data ──
-  getSymbols: () => Promise.resolve(DEMO_SYMBOLS),
-  getCandles: (symbol: string, timeframe: string, limit?: number) =>
-    Promise.resolve(getHistory(symbol, timeframe, limit)),
-  getCandlesWithMeta: (symbol: string, timeframe: string, limit?: number) =>
-    Promise.resolve(candlesMeta(getHistory(symbol, timeframe, limit))),
+  getSymbols: market.getWatchlistSymbols,
+  searchSymbols: market.searchSymbols,
+  getCandles: market.getCandles,
+  getCandlesWithMeta: market.getCandlesWithMeta,
   getTick: (symbol: string) => {
     const price = engine.getLastPrice(symbol);
     return Promise.resolve({ symbol, bid: price, ask: price, timestamp: Date.now() });
   },
-  getMarketDataHealth: () => Promise.resolve({ status: "ok" }),
+  getMarketDataHealth: () => market.getStatus().then((s) => ({ status: s.connected ? "ok" : "down", ...s })),
   getEconomicCalendar: () => Promise.resolve([]),
 
   // ── Trading (paper engine) ──
-  placeOrder: (data: engine.PlaceOrderArgs) => Promise.resolve(engine.placeOrder(data)),
+  placeOrder: async (data: engine.PlaceOrderArgs) => engine.placeOrder(data),
   cancelOrder: (orderId: string) => Promise.resolve(engine.cancelOrder(orderId)),
   modifyOrder: (orderId: string) => Promise.resolve(engine.getOrders().find((o) => o.id === orderId)),
   cancelAllOrders: () => Promise.resolve({ success: true }),

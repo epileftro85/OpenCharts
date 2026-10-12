@@ -4,6 +4,7 @@ import { useDragOffset } from "../../hooks/useDragOffset.ts";
 import { cn } from "../../lib/utils.ts";
 import type { NewsOverlayConfig } from "./constants.ts";
 import type { NewsPopupState } from "./useNewsOverlay.ts";
+import { useT } from "../../i18n/index.ts";
 
 interface NewsOverlayProps {
   newsConfig: NewsOverlayConfig;
@@ -28,6 +29,7 @@ export function NewsOverlay({
   containerRef,
 }: NewsOverlayProps) {
   const configDrag = useDragOffset();
+  const t = useT();
   return (
     <>
       {/* News event popup */}
@@ -90,7 +92,7 @@ export function NewsOverlay({
               </p>
               <div className="space-y-1.5">
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-muted-foreground">Actual</span>
+                  <span className="text-muted-foreground">{t("nov.actual")}</span>
                   <span
                     className={cn("font-bold font-mono", isDark ? "text-white" : "text-gray-900")}
                   >
@@ -98,11 +100,11 @@ export function NewsOverlay({
                   </span>
                 </div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-muted-foreground">Forecast</span>
+                  <span className="text-muted-foreground">{t("nov.forecast")}</span>
                   <span className="font-mono font-medium">{newsPopup.event.forecast || "—"}</span>
                 </div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-muted-foreground">Previous</span>
+                  <span className="text-muted-foreground">{t("nov.previous")}</span>
                   <span className="font-mono text-muted-foreground">
                     {newsPopup.event.previous || "—"}
                   </span>
@@ -143,10 +145,10 @@ export function NewsOverlay({
             ? "bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25"
             : "bg-secondary/60 text-muted-foreground border border-border hover:bg-secondary",
         )}
-        title="News overlay settings"
+        title={t("nov.settingsTitle")}
       >
         <Newspaper className="h-3 w-3" />
-        News
+        {t("nov.button")}
         <Settings2 className="h-2.5 w-2.5 ml-0.5 opacity-60" />
       </button>
 
@@ -174,7 +176,7 @@ export function NewsOverlay({
                 )}
               >
                 <GripVertical className="h-3 w-3 text-muted-foreground/60" />
-                News Overlay Settings
+                {t("nov.header")}
               </span>
               <button
                 onClick={() => setShowNewsConfigDialog(false)}
@@ -186,7 +188,7 @@ export function NewsOverlay({
 
             <div className="p-3 space-y-3">
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-[11px] font-medium">Enable News Overlay</span>
+                <span className="text-[11px] font-medium">{t("nov.enable")}</span>
                 <input
                   type="checkbox"
                   checked={newsConfig.enabled}
@@ -196,7 +198,7 @@ export function NewsOverlay({
               </label>
 
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium">Line Color</span>
+                <span className="text-[11px] font-medium">{t("nov.lineColor")}</span>
                 <div className="flex items-center gap-1.5">
                   <input
                     type="color"
@@ -219,10 +221,10 @@ export function NewsOverlay({
                     isDark ? "text-muted-foreground" : "text-gray-500",
                   )}
                 >
-                  Time Filters
+                  {t("nov.timeFilters")}
                 </span>
                 <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-[11px]">Show Past Events</span>
+                  <span className="text-[11px]">{t("nov.past")}</span>
                   <input
                     type="checkbox"
                     checked={newsConfig.showPast}
@@ -231,7 +233,7 @@ export function NewsOverlay({
                   />
                 </label>
                 <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-[11px]">Show Future Events</span>
+                  <span className="text-[11px]">{t("nov.future")}</span>
                   <input
                     type="checkbox"
                     checked={newsConfig.showFuture}
@@ -250,12 +252,12 @@ export function NewsOverlay({
                     isDark ? "text-muted-foreground" : "text-gray-500",
                   )}
                 >
-                  Impact Levels
+                  {t("nov.impact")}
                 </span>
                 <label className="flex items-center justify-between cursor-pointer">
                   <span className="flex items-center gap-1.5 text-[11px]">
                     <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
-                    High Impact
+                    {t("nov.high")}
                   </span>
                   <input
                     type="checkbox"
@@ -267,7 +269,7 @@ export function NewsOverlay({
                 <label className="flex items-center justify-between cursor-pointer">
                   <span className="flex items-center gap-1.5 text-[11px]">
                     <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
-                    Medium Impact
+                    {t("nov.medium")}
                   </span>
                   <input
                     type="checkbox"
@@ -279,7 +281,7 @@ export function NewsOverlay({
                 <label className="flex items-center justify-between cursor-pointer">
                   <span className="flex items-center gap-1.5 text-[11px]">
                     <span className="inline-block w-2 h-2 rounded-full bg-gray-400" />
-                    Low Impact
+                    {t("nov.low")}
                   </span>
                   <input
                     type="checkbox"

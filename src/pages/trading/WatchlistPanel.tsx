@@ -1,8 +1,17 @@
 import { useState, useCallback, useMemo } from "react";
-import { Star } from "lucide-react";
+import { Star, X } from "lucide-react";
 import { usePlaceOrder } from "../../services/queries.ts";
+import { useTradingStore } from "../../services/store.tsx";
+import { useT } from "../../i18n/index.ts";
 import { formatNumber, cn } from "../../lib/utils.ts";
 import { toast } from "../../services/toast.ts";
+
+/** Decimals implied by a tick size (0.01 → 2, 0.00001 → 5). */
+function decimalsOf(tickSize?: number): number {
+  if (!tickSize) return 5;
+  const dot = String(tickSize).indexOf(".");
+  return dot >= 0 ? String(tickSize).length - dot - 1 : 0;
+}
 
 export function WatchlistPanel({
   symbols,
@@ -20,6 +29,7 @@ export function WatchlistPanel({
     assetClass?: string;
     category?: string;
     isActive?: boolean;
+    tickSize?: number;
   }>;
   ticks: Record<string, { bid: number; ask: number; timestamp: number }>;
   selectedSymbol: string;
@@ -30,6 +40,8 @@ export function WatchlistPanel({
 }) {
   const [filter, setFilter] = useState("");
   const placeOrder = usePlaceOrder();
+  const removeFromWatchlist = useTradingStore((s) => s.removeFromWatchlist);
+  const t = useT();
 
   const [favorites, setFavorites] = useState<Set<string>>(() => {
     try {
@@ -77,10 +89,10 @@ export function WatchlistPanel({
     <div className="flex flex-col h-full">
       <div className="px-3 py-2 border-b border-border bg-secondary">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
-          Watchlist
+          {t("watch.title")}
         </h3>
         <input
-          placeholder="Search..."
+          placeholder={t("watch.filter")}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           className="w-full text-xs"
@@ -94,7 +106,7 @@ export function WatchlistPanel({
             !selectedCat ? "bg-primary text-primary-foreground" : "hover:bg-secondary",
           )}
         >
-          All
+          {t("watch.all")}
         </button>
         <button
           onClick={() => setSelectedCat("★")}
@@ -117,21 +129,21 @@ export function WatchlistPanel({
               selectedCat === c ? "bg-primary text-primary-foreground" : "hover:bg-secondary",
             )}
           >
-            {c}
+            {t(`cat.${c}`)}
           </button>
         ))}
       </div>
       <div className="flex-1 overflow-y-auto">
         {filtered.map((s) => {
-          const t = ticks[s.name];
+          const tk = ticks[s.name];
           const isFav = favorites.has(s.name);
           const handleQuickTrade = (side: "BUY" | "SELL") => {
             if (!isFeedConnected) {
-              toast.warning("No Data Feed", "Cannot trade while disconnected");
+              toast.warning(t("toast.noFeed"), t("toast.noFeed.trade"));
               return;
             }
             if (!accountId) {
-              toast.warning("No Account", "Select an account first");
+              toast.warning(t("toast.noAccount"), t("toast.noAccount.desc"));
               return;
             }
             placeOrder.mutate(
@@ -143,9 +155,9 @@ export function WatchlistPanel({
                 quantity: 0.1,
               },
               {
-                onSuccess: () => toast.success("Quick Trade", `${side} 0.1 ${s.name}`),
+                onSuccess: () => toast.success(t("toast.quickTrade"), `${t(`side.${side}`)} 0.1 ${s.name}`),
                 onError: (err: unknown) =>
-                  toast.error("Trade Failed", (err as { message?: string })?.message || "Failed"),
+                  toast.error(t("toast.tradeFailed"), (err as { message?: string })?.message || t("toast.failed")),
               },
             );
           };
@@ -171,13 +183,15 @@ export function WatchlistPanel({
               </button>
               <button onClick={() => onSelect(s.name)} className="text-left flex-1 min-w-0">
                 <div className="font-semibold">{s.name}</div>
-                <div className="text-[10px] text-muted-foreground">{s.category}</div>
+                <div className="truncate text-[10px] text-muted-foreground">
+                  {s.displayName && s.displayName !== s.name ? s.displayName : t(`cat.${s.category}`)}
+                </div>
               </button>
-              {t ? (
+              {tk ? (
                 <div className="flex items-center gap-1">
                   <div className="text-right font-mono">
-                    <div className="text-buy">{formatNumber(t.bid, 5)}</div>
-                    <div className="text-sell">{formatNumber(t.ask, 5)}</div>
+                    <div className="text-buy">{formatNumber(tk.bid, decimalsOf(s.tickSize))}</div>
+                    <div className="text-sell">{formatNumber(tk.ask, decimalsOf(s.tickSize))}</div>
                   </div>
                   {oneClick && (
                     <div className="hidden group-hover:flex flex-col gap-0.5 ml-1">
@@ -185,13 +199,13 @@ export function WatchlistPanel({
                         onClick={() => handleQuickTrade("BUY")}
                         className="px-1 py-0.5 text-[8px] rounded bg-buy/20 text-buy hover:bg-buy/30 font-semibold"
                       >
-                        B
+                        {t("watch.buy")}
                       </button>
                       <button
                         onClick={() => handleQuickTrade("SELL")}
                         className="px-1 py-0.5 text-[8px] rounded bg-sell/20 text-sell hover:bg-sell/30 font-semibold"
                       >
-                        S
+                        {t("watch.sell")}
                       </button>
                     </div>
                   )}
@@ -199,9 +213,22 @@ export function WatchlistPanel({
               ) : (
                 <span className="text-muted-foreground">--</span>
               )}
+              {symbols.length > 1 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFromWatchlist(s.name);
+                  }}
+                  title={t("watch.remove")}
+                  className="ml-1 hidden shrink-0 text-muted-foreground/60 hover:text-sell group-hover:block"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
           );
         })}
+        <p className="px-3 py-2 text-[10px] text-muted-foreground/70">{t("watch.addHint")}</p>
       </div>
     </div>
   );

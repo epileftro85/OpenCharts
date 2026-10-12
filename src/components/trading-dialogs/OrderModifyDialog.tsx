@@ -5,6 +5,7 @@ import { cn, formatNumber } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { X, SlidersHorizontal } from "lucide-react";
 import { useInstrumentLabels } from "../../hooks/useInstrumentLabels.ts";
+import { useT } from "../../i18n/index.ts";
 
 interface OrderModifyDialogProps {
   order: {
@@ -25,6 +26,7 @@ interface OrderModifyDialogProps {
 
 export function OrderModifyDialog({ order, onClose, onSaved, tick }: OrderModifyDialogProps) {
   const { unitLabelCap, isFutures } = useInstrumentLabels();
+  const t = useT();
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("");
   const [tp, setTp] = useState("");
@@ -71,23 +73,20 @@ export function OrderModifyDialog({ order, onClose, onSaved, tick }: OrderModify
       if (sl === "" && order.stopLoss != null) modifications.stopLoss = null;
 
       if (Object.keys(modifications).length === 0) {
-        toast.info("No Changes", "No modifications to apply");
+        toast.info(t("toast.noChanges"), t("toast.noChanges.desc"));
         setSaving(false);
         return;
       }
 
       await api.modifyOrder(order.id, modifications);
-      toast.success("Order Modified", "Pending order has been updated");
+      toast.success(t("toast.orderModified"), t("toast.orderModified.desc"));
       onSaved();
     } catch (err: unknown) {
       const e = err as { code?: string; message?: string };
       if (e?.code === "REQUEST_TIMEOUT") {
-        toast.error(
-          "Request Timed Out",
-          "The server didn't respond in time. Check your connection and try again.",
-        );
+        toast.error(t("toast.timeout"), t("toast.orderTimeout.desc"));
       } else {
-        toast.error("Modify Failed", e?.message || "Could not modify order");
+        toast.error(t("toast.modifyFailed"), e?.message || t("toast.modifyOrderFailed.desc"));
       }
     } finally {
       setSaving(false);
@@ -107,7 +106,7 @@ export function OrderModifyDialog({ order, onClose, onSaved, tick }: OrderModify
           >
             <h3 className="text-sm font-semibold flex items-center gap-2">
               <SlidersHorizontal className="h-4 w-4" />
-              Modify {order.side} {order.type} — {order.symbolName}
+              {t("modifyOrder.title", { side: t(`side.${order.side}`), type: t(`orderType.${order.type}`), symbol: order.symbolName })}
             </h3>
             <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
               <X className="h-4 w-4" />
@@ -117,7 +116,7 @@ export function OrderModifyDialog({ order, onClose, onSaved, tick }: OrderModify
           <div className="px-5 py-4 space-y-3">
             <div>
               <label className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Price
+                {t("order.price")}
               </label>
               <input
                 type="number"
@@ -129,7 +128,7 @@ export function OrderModifyDialog({ order, onClose, onSaved, tick }: OrderModify
             </div>
             <div>
               <label className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Quantity ({unitLabelCap})
+                {t("modifyOrder.qty", { unit: unitLabelCap })}
               </label>
               <input
                 type="number"
@@ -143,7 +142,7 @@ export function OrderModifyDialog({ order, onClose, onSaved, tick }: OrderModify
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                  Take Profit
+                  {t("order.takeProfit")}
                 </label>
                 <input
                   type="number"
@@ -155,7 +154,7 @@ export function OrderModifyDialog({ order, onClose, onSaved, tick }: OrderModify
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                  Stop Loss
+                  {t("order.stopLoss")}
                 </label>
                 <input
                   type="number"
@@ -181,7 +180,7 @@ export function OrderModifyDialog({ order, onClose, onSaved, tick }: OrderModify
 
           <div className="px-5 py-3 border-t border-border/40 flex gap-2">
             <Button variant="outline" className="flex-1" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant="default"
@@ -190,7 +189,7 @@ export function OrderModifyDialog({ order, onClose, onSaved, tick }: OrderModify
               disabled={saving}
               loading={saving}
             >
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? t("modify.saving") : t("modify.save")}
             </Button>
           </div>
         </div>

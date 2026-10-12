@@ -70,10 +70,13 @@ import { useSlTpDrag } from "./useSlTpDrag.ts";
 import {
   formatCountdown,
   getCandleBucketTime,
+  getAnchoredBucketTime,
   getMinMove,
   toUnixMs,
   toUnixSeconds,
 } from "./utils.ts";
+import { t as translateNow, useT } from "../../i18n/index.ts";
+import { useStructureOverlay } from "../../components/structure/useStructureOverlay.ts";
 
 // ── Staleness recovery ─────────────────────────────────────────────────────
 // Shared by the live-candle and tick-smoothing effects so either path can
@@ -463,7 +466,7 @@ function applyTick(tick: TickData, ctx: RtCtx): void {
   const prev = ctx.lastCandle.current;
   if (!prev) return;
   const mid = (tick.bid + tick.ask) / 2;
-  const bucketTime = getCandleBucketTime(tickMs, ctx.timeframe) as Time;
+  const bucketTime = getAnchoredBucketTime(prev.time as number, tickMs, ctx.timeframe) as Time;
   const isContinuation = prev.time === bucketTime;
   const bar = buildTickBar(prev, isContinuation, bucketTime, mid, ctx);
   if (!bar) return;
@@ -744,7 +747,7 @@ function addPositionOverlay(
       lineWidth: 1,
       lineStyle: LineStyle.Dotted,
       axisLabelVisible: true,
-      title: `${pos.side === "LONG" ? "buy" : "sell"} ${pos.quantity.toFixed(2)}`,
+      title: `${translateNow(pos.side === "LONG" ? "chart.lineBuy" : "chart.lineSell")} ${Number(pos.quantity.toFixed(4))}`,
     }),
   );
   const direction = pos.side === "LONG" ? 1 : -1;
@@ -1034,12 +1037,13 @@ function ObjectTreeOverlay({
   onRemove: (id: string) => void;
   onReorder: (d: DrawingLine, dir: "front" | "back") => void;
 }) {
+  const t = useT();
   if (drawings.length === 0) return null;
   return (
     <>
       <button
         type="button"
-        title="Object tree (drawings)"
+        title={t("chart.treeButton")}
         onClick={onToggle}
         className={cn(
           "absolute bottom-2 left-2 z-10 p-1.5 rounded-md border border-border bg-card/90 shadow",
@@ -1367,8 +1371,8 @@ export function ChartPanel({
       const text = price.toFixed(pipDigits);
       void navigator.clipboard
         ?.writeText(text)
-        .then(() => toast.success("Copied", text))
-        .catch(() => toast.error("Copy failed", "Clipboard unavailable"));
+        .then(() => toast.success(translateNow("chart.copied"), text))
+        .catch(() => toast.error(translateNow("chart.copyFailed"), translateNow("chart.clipboard")));
     },
     [pipDigits],
   );
@@ -1384,12 +1388,13 @@ export function ChartPanel({
         alertEnabled: true,
         createdTf: timeframe,
       });
-      toast.info("Alert set", `${selectedSymbol} at ${rounded}`);
+      toast.info(translateNow("chart.alertSet"), translateNow("chart.alertAt", { symbol: selectedSymbol, price: rounded }));
     },
     [onAddDrawing, pipDigits, timeframe, selectedSymbol],
   );
 
   useIndicators(chartRef, candleSeriesRef, chartData, activeIndicators, isDark);
+  useStructureOverlay(chartRef, candleSeriesRef, volumeSeriesRef, chartData, selectedSymbol, timeframe);
 
   // ── Replay trade event markers ─────────────────────────────
   useEffect(() => {
@@ -1851,8 +1856,13 @@ export function ChartPanel({
     const crossed = detectCrossings(drawingsRef.current, prev, mid, nowSec, alertFiredRef.current);
     for (const d of crossed) {
       toast.info(
-        "Price alert",
-        d.alertMessage ?? `${selectedSymbol} crossed your ${d.type} @ ${mid.toFixed(pipDigits)}`,
+        translateNow("chart.priceAlert"),
+        d.alertMessage ??
+          translateNow("chart.crossed", {
+            symbol: selectedSymbol,
+            tool: translateNow(`tool.${d.type}`).toLowerCase(),
+            price: mid.toFixed(pipDigits),
+          }),
       );
       playAlertBeep();
     }

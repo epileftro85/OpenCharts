@@ -1,4 +1,6 @@
 import { formatNumber, formatDate } from "../../lib/utils.ts";
+import { useT } from "../../i18n/index.ts";
+import { symbolDigits } from "./utils.ts";
 
 interface OrderRow {
   id: string;
@@ -25,10 +27,11 @@ export function OrdersTable({
   onModify?: (order: OrderRow) => void;
   onSelectSymbol?: (symbolName: string) => void;
 }) {
+  const t = useT();
   if (orders.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-        No pending orders
+        {t("orders.empty")}
       </div>
     );
   }
@@ -37,15 +40,15 @@ export function OrdersTable({
     <table className="w-full text-[11px]">
       <thead className="sticky top-0 bg-card z-10">
         <tr>
-          <th>Symbol</th>
-          <th>Side</th>
-          <th>Type</th>
-          <th>Qty</th>
-          <th>Price</th>
-          <th>SL</th>
-          <th>TP</th>
-          <th>Status</th>
-          <th>Time</th>
+          <th>{t("col.symbol")}</th>
+          <th>{t("col.side")}</th>
+          <th>{t("col.type")}</th>
+          <th>{t("col.volume")}</th>
+          <th>{t("col.price")}</th>
+          <th>{t("col.sl")}</th>
+          <th>{t("col.tp")}</th>
+          <th>{t("col.status")}</th>
+          <th>{t("col.time")}</th>
           <th></th>
         </tr>
       </thead>
@@ -67,23 +70,23 @@ export function OrdersTable({
             tabIndex={onSelectSymbol ? 0 : undefined}
           >
             <td className="font-semibold">{o.symbolName}</td>
-            <td className={o.side === "BUY" ? "text-buy" : "text-sell"}>{o.side}</td>
-            <td>{o.type}</td>
+            <td className={o.side === "BUY" ? "text-buy" : "text-sell"}>{t(`side.${o.side}`)}</td>
+            <td>{t(`orderType.${o.type}`)}</td>
             <td className="font-mono">{o.quantity}</td>
             <td className="font-mono">
               {o.price
-                ? formatNumber(o.price, 5)
+                ? formatNumber(o.price, symbolDigits(o.symbolName))
                 : o.stopPrice
-                  ? formatNumber(o.stopPrice, 5)
-                  : "MKT"}
+                  ? formatNumber(o.stopPrice, symbolDigits(o.symbolName))
+                  : t("orders.market")}
             </td>
             <td className="font-mono text-sell">
-              {o.stopLoss ? formatNumber(o.stopLoss, 5) : "--"}
+              {o.stopLoss ? formatNumber(o.stopLoss, symbolDigits(o.symbolName)) : "--"}
             </td>
             <td className="font-mono text-buy">
-              {o.takeProfit ? formatNumber(o.takeProfit, 5) : "--"}
+              {o.takeProfit ? formatNumber(o.takeProfit, symbolDigits(o.symbolName)) : "--"}
             </td>
-            <td>{o.status}</td>
+            <td>{t(`status.${o.status}`)}</td>
             <td className="text-muted-foreground">{formatDate(o.createdAt)}</td>
             <td>
               <div className="flex gap-1">
@@ -95,7 +98,7 @@ export function OrdersTable({
                     }}
                     className="px-1.5 py-0.5 text-[10px] rounded bg-accent/20 text-accent hover:bg-accent/30"
                   >
-                    Modify
+                    {t("positions.modify")}
                   </button>
                 )}
                 <button
@@ -105,7 +108,7 @@ export function OrdersTable({
                   }}
                   className="px-1.5 py-0.5 text-[10px] rounded bg-warning/20 text-warning hover:bg-warning/30"
                 >
-                  Cancel
+                  {t("orders.cancel")}
                 </button>
               </div>
             </td>

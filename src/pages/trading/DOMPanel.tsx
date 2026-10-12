@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { useT } from "../../i18n/index.ts";
+import { symbolDigits } from "./utils.ts";
 import { formatNumber, cn } from "../../lib/utils.ts";
 
 export function DOMPanel({
@@ -47,13 +49,15 @@ export function DOMPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick?.bid, tick?.ask]);
 
+  const t = useT();
+  const digits = symbolDigits(symbol);
   const maxSize = Math.max(...levels.map((l) => Math.max(l.bidSize, l.askSize)), 1);
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-secondary">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Depth of Market
+          {t("dom.title")}
         </h3>
         <span className="text-xs font-semibold">{symbol}</span>
       </div>
@@ -61,9 +65,9 @@ export function DOMPanel({
         <table className="w-full text-[11px]">
           <thead className="sticky top-0 bg-card z-10">
             <tr>
-              <th className="text-right w-[30%]">Bid Size</th>
-              <th className="text-center w-[40%]">Price</th>
-              <th className="text-left w-[30%]">Ask Size</th>
+              <th className="text-right w-[30%]">{t("dom.bidSize")}</th>
+              <th className="text-center w-[40%]">{t("dom.price")}</th>
+              <th className="text-left w-[30%]">{t("dom.askSize")}</th>
             </tr>
           </thead>
           <tbody>
@@ -86,7 +90,7 @@ export function DOMPanel({
                     l.type === "ask" ? "text-sell" : "text-buy",
                   )}
                 >
-                  {formatNumber(l.price, 5)}
+                  {formatNumber(l.price, digits)}
                 </td>
                 <td className="text-left relative">
                   {l.askSize > 0 && (
@@ -103,6 +107,7 @@ export function DOMPanel({
             ))}
           </tbody>
         </table>
+        <p className="px-3 py-2 text-[10px] text-muted-foreground/70">{t("dom.synthetic")}</p>
       </div>
     </div>
   );

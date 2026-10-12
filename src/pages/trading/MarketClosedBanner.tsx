@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Clock } from "lucide-react";
 import type { Symbol } from "../../services/schemas";
 import { useTradingStore } from "../../services/store.tsx";
+import { useT } from "../../i18n/index.ts";
 
 /**
  * How long after the last tick we consider the feed still live.
@@ -117,6 +118,7 @@ export function MarketClosedBanner({ symbolInfo }: Props) {
   const [now, setNow] = useState(() => new Date());
   const [mountedAt] = useState(() => Date.now());
   const ticks = useTradingStore((s) => s.ticks);
+  const t = useT();
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -157,11 +159,11 @@ export function MarketClosedBanner({ symbolInfo }: Props) {
     >
       <Clock className="h-3 w-3 shrink-0" />
       <span>
-        Market closed
+        {t("market.closed")}
         {msUntilOpen != null && (
           <>
             {" "}
-            · Opens in{" "}
+            · {t("market.opensIn")}{" "}
             <span className="font-mono tabular-nums">
               {formatCountdown(msUntilOpen - (new Date().getTime() - now.getTime()))}
             </span>

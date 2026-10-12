@@ -1,13 +1,13 @@
 /**
- * Demo API facade.
+ * API facade.
  *
- * OpenCharts runs without a backend: all real data the terminal needs is served
- * by the in-browser demo layer (services/demo). `api` is the demo implementation
- * wrapped in a Proxy whose fallback returns a benign async no-op for any method
- * not implemented in demo mode — so leftover calls from non-terminal code resolve
- * harmlessly instead of throwing network errors.
+ * Market data comes from the local server (services/server → server/), trading
+ * from the in-browser paper engine (services/paper). `api` is that table wrapped
+ * in a Proxy whose fallback returns a benign async no-op for any method not
+ * implemented — so leftover calls from the platform this terminal was extracted
+ * from resolve harmlessly instead of throwing network errors.
  */
-import { demoApi } from "./demo/api.ts";
+import { paperApi } from "./paper/api.ts";
 
 export const API_BASE = "";
 
@@ -23,9 +23,9 @@ export class ApiError extends Error {
 // react-query rejects `undefined` query results, so resolve to null instead.
 const benign = () => Promise.resolve(null);
 
-export const api = new Proxy(demoApi as Record<string, unknown>, {
+export const api = new Proxy(paperApi as Record<string, unknown>, {
   get(target, prop: string) {
     if (prop in target) return target[prop];
     return benign;
   },
-}) as typeof demoApi & Record<string, (...args: never[]) => Promise<unknown>>;
+}) as typeof paperApi & Record<string, (...args: never[]) => Promise<unknown>>;

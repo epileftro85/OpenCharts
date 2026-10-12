@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { X, Scissors } from "lucide-react";
 import { formatNumber, formatCurrency, formatDate, cn, pnlClass } from "../../lib/utils.ts";
+import { useT } from "../../i18n/index.ts";
+import { symbolDigits } from "./utils.ts";
 
 interface PositionRow {
   id: string;
@@ -28,13 +30,14 @@ export function PositionsTable({
   onPartialClose?: (id: string, quantity: number) => void;
   onSelectSymbol?: (symbolName: string) => void;
 }) {
+  const t = useT();
   const [partialCloseId, setPartialCloseId] = useState<string | null>(null);
   const [partialQty, setPartialQty] = useState("");
 
   if (positions.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-        No open positions
+        {t("positions.empty")}
       </div>
     );
   }
@@ -51,15 +54,15 @@ export function PositionsTable({
     <table className="w-full text-[11px]">
       <thead className="sticky top-0 bg-card z-10">
         <tr>
-          <th>Symbol</th>
-          <th>Side</th>
-          <th>Qty</th>
-          <th>Entry</th>
-          <th>Current</th>
-          <th>P&L</th>
-          <th>SL</th>
-          <th>TP</th>
-          <th>Time</th>
+          <th>{t("col.symbol")}</th>
+          <th>{t("col.side")}</th>
+          <th>{t("col.volume")}</th>
+          <th>{t("col.entry")}</th>
+          <th>{t("col.current")}</th>
+          <th>{t("col.pnl")}</th>
+          <th>{t("col.sl")}</th>
+          <th>{t("col.tp")}</th>
+          <th>{t("col.time")}</th>
           <th></th>
         </tr>
       </thead>
@@ -79,19 +82,19 @@ export function PositionsTable({
             tabIndex={onSelectSymbol ? 0 : undefined}
           >
             <td className="font-semibold">{p.symbolName}</td>
-            <td className={p.side === "LONG" ? "text-buy" : "text-sell"}>{p.side}</td>
+            <td className={p.side === "LONG" ? "text-buy" : "text-sell"}>{t(`side.${p.side}`)}</td>
             <td className="font-mono">{p.quantity}</td>
-            <td className="font-mono">{formatNumber(p.entryPrice, 5)}</td>
-            <td className="font-mono">{p.currentPrice ? formatNumber(p.currentPrice, 5) : "--"}</td>
+            <td className="font-mono">{formatNumber(p.entryPrice, symbolDigits(p.symbolName))}</td>
+            <td className="font-mono">{p.currentPrice ? formatNumber(p.currentPrice, symbolDigits(p.symbolName)) : "--"}</td>
             <td className={cn("font-mono font-semibold", pnlClass(p.unrealizedPnl))}>
               {p.unrealizedPnl >= 0 ? "+" : ""}
               {formatCurrency(p.unrealizedPnl)}
             </td>
             <td className="font-mono text-sell">
-              {p.stopLoss ? formatNumber(p.stopLoss, 5) : "--"}
+              {p.stopLoss ? formatNumber(p.stopLoss, symbolDigits(p.symbolName)) : "--"}
             </td>
             <td className="font-mono text-buy">
-              {p.takeProfit ? formatNumber(p.takeProfit, 5) : "--"}
+              {p.takeProfit ? formatNumber(p.takeProfit, symbolDigits(p.symbolName)) : "--"}
             </td>
             <td className="text-muted-foreground">{formatDate(p.openedAt)}</td>
             <td>
@@ -102,7 +105,7 @@ export function PositionsTable({
                     value={partialQty}
                     onChange={(e) => setPartialQty(e.target.value)}
                     onClick={(e) => e.stopPropagation()}
-                    placeholder={`Max ${p.quantity}`}
+                    placeholder={t("positions.maxQty", { qty: p.quantity })}
                     min={0.01}
                     max={p.quantity - 0.01}
                     step="any"
@@ -123,7 +126,7 @@ export function PositionsTable({
                     }}
                     className="px-1 py-0.5 text-[9px] rounded bg-warning/20 text-warning hover:bg-warning/30"
                   >
-                    Go
+                    {t("positions.go")}
                   </button>
                   <button
                     onClick={(e) => {
@@ -146,7 +149,7 @@ export function PositionsTable({
                       }}
                       className="px-1.5 py-0.5 text-[10px] rounded bg-accent/20 text-accent hover:bg-accent/30"
                     >
-                      Modify
+                      {t("positions.modify")}
                     </button>
                   )}
                   {onPartialClose && p.quantity > 1 && (
@@ -157,9 +160,9 @@ export function PositionsTable({
                         setPartialQty("");
                       }}
                       className="px-1.5 py-0.5 text-[10px] rounded bg-warning/20 text-warning hover:bg-warning/30 flex items-center gap-0.5"
-                      title="Partial Close"
+                      title={t("positions.partialTitle")}
                     >
-                      <Scissors className="h-2.5 w-2.5" /> Partial
+                      <Scissors className="h-2.5 w-2.5" /> {t("positions.partial")}
                     </button>
                   )}
                   <button
@@ -169,7 +172,7 @@ export function PositionsTable({
                     }}
                     className="px-1.5 py-0.5 text-[10px] rounded bg-destructive/20 text-destructive hover:bg-destructive/30"
                   >
-                    Close
+                    {t("positions.close")}
                   </button>
                 </div>
               )}

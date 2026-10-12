@@ -27,6 +27,7 @@ import {
   saveTemplate,
   setTypeDefault,
 } from "./drawingStyles.ts";
+import { useT, useTx } from "../../i18n/index.ts";
 
 // ── Floating toolbar (TradingView-style) shown while a drawing is selected ──
 
@@ -59,10 +60,11 @@ function IconButton({
   onClick: () => void;
   children: React.ReactNode;
 }) {
+  const tx = useTx("dw");
   return (
     <button
       type="button"
-      title={title}
+      title={tx(title)}
       onClick={onClick}
       className={cn(
         "p-1 rounded hover:bg-secondary",
@@ -212,9 +214,10 @@ export interface DrawingSettingsProps {
 }
 
 function SettingsRow({ label, children }: { label: string; children: React.ReactNode }) {
+  const tx = useTx("dw");
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-xs text-muted-foreground">{tx(label)}</span>
       {children}
     </div>
   );
@@ -227,6 +230,7 @@ function ExtendToggles({
   drawing: DrawingLine;
   patch: (p: Partial<DrawingLine>) => void;
 }) {
+  const t = useT();
   return (
     <SettingsRow label="Extend">
       <div className="flex items-center gap-3 text-xs">
@@ -236,7 +240,7 @@ function ExtendToggles({
             checked={drawing.extendLeft ?? false}
             onChange={(e) => patch({ extendLeft: e.target.checked })}
           />
-          Left
+          {t("dw.left")}
         </label>
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input
@@ -244,7 +248,7 @@ function ExtendToggles({
             checked={drawing.extendRight ?? false}
             onChange={(e) => patch({ extendRight: e.target.checked })}
           />
-          Right
+          {t("dw.right")}
         </label>
       </div>
     </SettingsRow>
@@ -290,6 +294,7 @@ function ArrowheadToggles({
   drawing: DrawingLine;
   patch: (p: Partial<DrawingLine>) => void;
 }) {
+  const t = useT();
   return (
     <SettingsRow label="Arrows">
       <div className="flex items-center gap-3 text-xs">
@@ -299,7 +304,7 @@ function ArrowheadToggles({
             checked={drawing.arrowStart ?? false}
             onChange={(e) => patch({ arrowStart: e.target.checked })}
           />
-          Start
+          {t("dw.start")}
         </label>
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input
@@ -307,7 +312,7 @@ function ArrowheadToggles({
             checked={drawing.arrowEnd ?? false}
             onChange={(e) => patch({ arrowEnd: e.target.checked })}
           />
-          End
+          {t("dw.end")}
         </label>
       </div>
     </SettingsRow>
@@ -479,11 +484,12 @@ function TextToggleRow({
   onToggle: (v: boolean) => void;
   onColor: (c: string) => void;
 }) {
+  const tx = useTx("dw");
   return (
     <div className="flex items-center gap-2">
       <label className="flex flex-1 items-center gap-2 text-xs cursor-pointer">
         <input type="checkbox" checked={enabled} onChange={(e) => onToggle(e.target.checked)} />
-        {label}
+        {tx(label)}
       </label>
       <input
         type="color"
@@ -503,13 +509,14 @@ function TextSettings({
   drawing: DrawingLine;
   patch: (p: Partial<DrawingLine>) => void;
 }) {
+  const t = useT();
   return (
     <div className="space-y-2.5">
       <TextFormatBar drawing={drawing} patch={patch} />
       <textarea
         value={drawing.text ?? ""}
         onChange={(e) => patch({ text: e.target.value })}
-        placeholder="Text"
+        placeholder={t("dw.textPlaceholder")}
         rows={5}
         style={{
           fontWeight: drawing.bold ? 700 : 400,
@@ -585,26 +592,27 @@ function StyleTools({
   drawing: DrawingLine;
   patch: (p: Partial<DrawingLine>) => void;
 }) {
+  const t = useT();
   const [templates, setTemplates] = useState<DrawingTemplate[]>(() => getTemplates());
   const btn = "px-2 py-1 rounded text-xs bg-secondary hover:bg-secondary/70";
   return (
     <div className="space-y-2 pt-1 border-t border-border/60">
       <div className="flex items-center gap-2">
         <button type="button" className={btn} onClick={() => setTypeDefault(drawing.type, drawing)}>
-          Set as default
+          {t("dw.setDefault")}
         </button>
         <button
           type="button"
           className={btn}
           onClick={() => {
-            const name = window.prompt("Template name")?.trim();
+            const name = window.prompt(t("dw.templatePrompt"))?.trim();
             if (name) {
               saveTemplate(name, drawing);
               setTemplates(getTemplates());
             }
           }}
         >
-          Save template
+          {t("dw.saveTemplate")}
         </button>
       </div>
       {templates.length > 0 && (
@@ -612,15 +620,15 @@ function StyleTools({
           <select
             value=""
             onChange={(e) => {
-              const t = templates.find((x) => x.name === e.target.value);
-              if (t) patch(t.style);
+              const tpl = templates.find((x) => x.name === e.target.value);
+              if (tpl) patch(tpl.style);
             }}
             className="bg-secondary text-xs rounded px-1.5 py-1 border border-border"
           >
-            <option value="">Apply…</option>
-            {templates.map((t) => (
-              <option key={t.name} value={t.name}>
-                {t.name}
+            <option value="">{t("dw.apply")}</option>
+            {templates.map((tpl) => (
+              <option key={tpl.name} value={tpl.name}>
+                {tpl.name}
               </option>
             ))}
           </select>
@@ -639,6 +647,7 @@ export function DrawingSettingsDialog({
 }: DrawingSettingsProps) {
   const patch = (p: Partial<DrawingLine>) => onUpdate({ ...drawing, ...p });
   const drag = useDragOffset();
+  const t = useT();
   const isText = drawing.type === "text";
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40">
@@ -655,7 +664,7 @@ export function DrawingSettingsDialog({
         >
           <span className="flex items-center gap-1.5 text-sm font-semibold capitalize">
             <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60" />
-            {drawing.type} settings
+            {t("dw.settingsTitle", { tool: t(`tool.${drawing.type}`) })}
           </span>
           <button
             type="button"
@@ -687,8 +696,8 @@ export function DrawingSettingsDialog({
             }
             className="bg-secondary text-xs rounded px-1.5 py-1 border border-border"
           >
-            <option value="all">All timeframes</option>
-            <option value="tf">Only {drawing.createdTf ?? currentTf}</option>
+            <option value="all">{t("dw.allTf")}</option>
+            <option value="tf">{t("dw.onlyTf", { tf: drawing.createdTf ?? currentTf })}</option>
           </select>
         </SettingsRow>
 
@@ -704,14 +713,14 @@ export function DrawingSettingsDialog({
             className="flex items-center gap-1.5 px-2 py-1 rounded text-xs text-[#f6465d] hover:bg-[#f6465d]/10"
           >
             <Trash2 className="h-3 w-3" />
-            Delete
+            {t("common.delete")}
           </button>
           <button
             type="button"
             onClick={onClose}
             className="px-3 py-1 rounded text-xs bg-primary text-primary-foreground hover:opacity-90"
           >
-            Done
+            {t("dw.done")}
           </button>
         </div>
       </div>
@@ -745,6 +754,7 @@ function MenuItem({
   danger?: boolean;
   onClick: () => void;
 }) {
+  const tx = useTx("dw");
   return (
     <button
       type="button"
@@ -755,7 +765,7 @@ function MenuItem({
       )}
     >
       <Icon className="h-3.5 w-3.5" />
-      {label}
+      {tx(label)}
     </button>
   );
 }
@@ -772,6 +782,7 @@ export function DrawingContextMenu({
   onToggleAlert,
   onRemove,
 }: DrawingContextMenuProps) {
+  const tx = useTx("dw");
   const canAlert = drawing.type === "horizontal" || drawing.type === "trendline";
   const act = (fn: () => void) => () => {
     fn();
@@ -781,7 +792,7 @@ export function DrawingContextMenu({
     <>
       <button
         type="button"
-        aria-label="Close menu"
+        aria-label={tx("Close menu")}
         className="fixed inset-0 z-40 cursor-default"
         onClick={onClose}
       />

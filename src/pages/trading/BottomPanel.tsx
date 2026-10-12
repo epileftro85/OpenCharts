@@ -24,6 +24,9 @@ import { MOCK_EVENTS, MOCK_NEWS } from "./constants.ts";
 import { PositionsTable } from "./PositionsTable.tsx";
 import { OrdersTable } from "./OrdersTable.tsx";
 import { computeLivePnl, computeLivePrice } from "../../lib/livePnl.ts";
+import { t as translateNow, useT } from "../../i18n/index.ts";
+import { getSymbolSpec } from "../../services/paper/symbols.ts";
+import { getPipDigits } from "./utils.ts";
 
 type TradingActionError = {
   error?: { message?: string };
@@ -34,7 +37,7 @@ type AccountOption = Pick<Account, "id"> & { label?: string | null };
 
 function getErrorMessage(error: unknown): string {
   const actionError = error as TradingActionError;
-  return actionError.error?.message || actionError.message || "Request failed";
+  return actionError.error?.message || actionError.message || translateNow("err.request");
 }
 
 export interface BottomPanelProps {
@@ -78,6 +81,7 @@ export function BottomPanel({
   height = 220,
   isFeedConnected = true,
 }: BottomPanelProps) {
+  const t = useT();
   const isDemo = useAuthStore((s) => s.isDemo);
   const cancelOrder = useCancelOrder();
   const closePosition = useClosePosition();
@@ -87,49 +91,49 @@ export function BottomPanel({
 
   const handleCancel = (orderId: string) => {
     if (!accountId || isDemo) {
-      if (isDemo) toast.warning("Demo Mode", "Trading actions are disabled in demo mode");
+      if (isDemo) toast.warning(t("toast.demo"), t("toast.demo.desc"));
       return;
     }
     if (!isFeedConnected) {
-      toast.warning("No Data Feed", "Cannot cancel orders while disconnected");
+      toast.warning(t("toast.noFeed"), t("toast.noFeed.cancel"));
       return;
     }
     if (cancelOrder.isPending) return;
     cancelOrder.mutate(
       { orderId, accountId },
       {
-        onSuccess: () => toast.info("Order Cancelled", "Pending order has been cancelled"),
-        onError: (err: unknown) => toast.error("Cancel Failed", getErrorMessage(err)),
+        onSuccess: () => toast.info(t("toast.orderCancelled"), t("toast.orderCancelled.desc")),
+        onError: (err: unknown) => toast.error(t("toast.cancelFailed"), getErrorMessage(err)),
       },
     );
   };
 
   const handleClosePosition = (positionId: string) => {
     if (!accountId || isDemo) {
-      if (isDemo) toast.warning("Demo Mode", "Trading actions are disabled in demo mode");
+      if (isDemo) toast.warning(t("toast.demo"), t("toast.demo.desc"));
       return;
     }
     if (!isFeedConnected) {
-      toast.warning("No Data Feed", "Cannot close positions while disconnected");
+      toast.warning(t("toast.noFeed"), t("toast.noFeed.close"));
       return;
     }
     if (closePosition.isPending) return;
     closePosition.mutate(
       { positionId, accountId },
       {
-        onSuccess: () => toast.success("Position Closed", "Position has been closed"),
-        onError: (err: unknown) => toast.error("Close Failed", getErrorMessage(err)),
+        onSuccess: () => toast.success(t("toast.positionClosed"), t("toast.positionClosed.desc")),
+        onError: (err: unknown) => toast.error(t("toast.closeFailed"), getErrorMessage(err)),
       },
     );
   };
 
   const handlePartialClose = (positionId: string, quantity: number) => {
     if (!accountId || isDemo) {
-      if (isDemo) toast.warning("Demo Mode", "Trading actions are disabled in demo mode");
+      if (isDemo) toast.warning(t("toast.demo"), t("toast.demo.desc"));
       return;
     }
     if (!isFeedConnected) {
-      toast.warning("No Data Feed", "Cannot close positions while disconnected");
+      toast.warning(t("toast.noFeed"), t("toast.noFeed.close"));
       return;
     }
     if (closePosition.isPending) return;
@@ -137,24 +141,24 @@ export function BottomPanel({
       { positionId, accountId, quantity },
       {
         onSuccess: () =>
-          toast.success("Partial Close", `Closed ${quantity} lot(s) of the position`),
-        onError: (err: unknown) => toast.error("Partial Close Failed", getErrorMessage(err)),
+          toast.success(t("toast.partialClose"), t("toast.partialClose.desc", { qty: quantity })),
+        onError: (err: unknown) => toast.error(t("toast.partialCloseFailed"), getErrorMessage(err)),
       },
     );
   };
 
   const handleCloseAll = () => {
     if (!accountId || isDemo) {
-      if (isDemo) toast.warning("Demo Mode", "Trading actions are disabled in demo mode");
+      if (isDemo) toast.warning(t("toast.demo"), t("toast.demo.desc"));
       return;
     }
     if (!isFeedConnected) {
-      toast.warning("No Data Feed", "Cannot close positions while disconnected");
+      toast.warning(t("toast.noFeed"), t("toast.noFeed.close"));
       return;
     }
     closeAllPositions.mutate(accountId, {
-      onSuccess: () => toast.success("All Closed", "All positions have been closed"),
-      onError: (err: unknown) => toast.error("Close All Failed", getErrorMessage(err)),
+      onSuccess: () => toast.success(t("toast.allClosed"), t("toast.allClosed.desc")),
+      onError: (err: unknown) => toast.error(t("toast.closeAllFailed"), getErrorMessage(err)),
     });
   };
 
@@ -197,22 +201,22 @@ export function BottomPanel({
     >
       {/* Tab bar */}
       <div className="flex items-center gap-0.5 px-2 py-1 border-b border-border bg-secondary text-xs overflow-x-auto no-scrollbar">
-        {tabs.map((t) => (
+        {tabs.map((tb) => (
           <button
-            key={t.key}
-            onClick={() => onTabChange(t.key)}
+            key={tb.key}
+            onClick={() => onTabChange(tb.key)}
             className={cn(
               "flex items-center gap-1 px-2.5 py-1 rounded shrink-0 whitespace-nowrap",
-              tab === t.key
+              tab === tb.key
                 ? "bg-card text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            <t.icon className="h-3 w-3" />
-            <span className="hidden md:inline">{t.label}</span>
-            {t.count !== undefined && t.count > 0 && (
+            <tb.icon className="h-3 w-3" />
+            <span className="hidden md:inline">{t(`tab.${tb.key}`)}</span>
+            {tb.count !== undefined && tb.count > 0 && (
               <span className="bg-primary text-primary-foreground rounded-full px-1.5 text-[9px]">
-                {t.count}
+                {tb.count}
               </span>
             )}
           </button>
@@ -221,7 +225,7 @@ export function BottomPanel({
         {tab === "positions" && openPositions.length > 0 && (
           <div className="ml-auto flex items-center gap-2">
             <span className={cn("font-mono text-xs font-semibold", pnlClass(totalPnl))}>
-              P&L: {totalPnl >= 0 ? "+" : ""}
+              {t("bottom.pnl")} {totalPnl >= 0 ? "+" : ""}
               {formatCurrency(totalPnl)}
             </span>
             <Button
@@ -231,7 +235,7 @@ export function BottomPanel({
               className="text-[10px] h-5"
               disabled={closeAllPositions.isPending || isDemo || !isFeedConnected}
             >
-              Close All
+              {t("bottom.closeAll")}
             </Button>
           </div>
         )}
@@ -300,6 +304,7 @@ export function BottomPanel({
 
 // ── Trade History Table ──────────────────────────────────────
 function TradeHistoryTable({ accountId }: { accountId: string | null }) {
+  const t = useT();
   const [page, setPage] = useState(1);
   const { data: closedData, isLoading } = useClosedPositions(accountId, page);
   const trades: ClosedPosition[] = closedData?.data || [];
@@ -318,20 +323,21 @@ function TradeHistoryTable({ accountId }: { accountId: string | null }) {
   if (!accountId)
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-        Select an account
+        {t("history.selectAccount")}
       </div>
     );
   if (isLoading)
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-        Loading...
+        {t("common.loading")}
       </div>
     );
   if (trades.length === 0)
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-        No trade history yet
-        {activeAccount ? ` for ${activeAccount.label || accountId?.slice(0, 8)}` : ""}
+        {activeAccount
+          ? t("history.emptyFor", { account: activeAccount.label || accountId?.slice(0, 8) || "" })
+          : t("history.empty")}
       </div>
     );
 
@@ -340,32 +346,33 @@ function TradeHistoryTable({ accountId }: { accountId: string | null }) {
       <table className="w-full text-[11px]">
         <thead className="sticky top-0 bg-card z-10">
           <tr>
-            <th>Closed</th>
-            <th>Symbol</th>
-            <th>Side</th>
-            <th>Volume</th>
-            <th>Entry</th>
-            <th>Exit</th>
-            <th>Commission</th>
-            <th>Gross P&L</th>
-            <th>Net P&L</th>
+            <th>{t("col.closed")}</th>
+            <th>{t("col.symbol")}</th>
+            <th>{t("col.side")}</th>
+            <th>{t("col.volume")}</th>
+            <th>{t("col.entry")}</th>
+            <th>{t("col.exit")}</th>
+            <th>{t("col.commission")}</th>
+            <th>{t("col.grossPnl")}</th>
+            <th>{t("col.netPnl")}</th>
           </tr>
         </thead>
         <tbody>
-          {trades.map((t) => {
-            const comm = t.commission ?? 0;
-            const gross = t.realizedPnl ?? 0;
+          {trades.map((tr) => {
+            const comm = tr.commission ?? 0;
+            const gross = tr.realizedPnl ?? 0;
             const net = gross - comm;
+            const digits = getPipDigits(getSymbolSpec(tr.symbolName), tr.symbolName);
             return (
-              <tr key={t.id} className="hover:bg-secondary/30">
+              <tr key={tr.id} className="hover:bg-secondary/30">
                 <td className="text-muted-foreground font-mono">
-                  {formatDate(t.closedAt || t.openedAt)}
+                  {formatDate(tr.closedAt || tr.openedAt)}
                 </td>
-                <td className="font-semibold">{t.symbolName}</td>
-                <td className={t.side === "LONG" ? "text-buy" : "text-sell"}>{t.side}</td>
-                <td className="font-mono">{t.quantity}</td>
-                <td className="font-mono">{t.entryPrice ? formatNumber(t.entryPrice, 5) : "--"}</td>
-                <td className="font-mono">{t.exitPrice ? formatNumber(t.exitPrice, 5) : "--"}</td>
+                <td className="font-semibold">{tr.symbolName}</td>
+                <td className={tr.side === "LONG" ? "text-buy" : "text-sell"}>{t(`side.${tr.side}`)}</td>
+                <td className="font-mono">{tr.quantity}</td>
+                <td className="font-mono">{tr.entryPrice ? formatNumber(tr.entryPrice, digits) : "--"}</td>
+                <td className="font-mono">{tr.exitPrice ? formatNumber(tr.exitPrice, digits) : "--"}</td>
                 <td className="font-mono text-muted-foreground">
                   {comm > 0 ? `-${comm.toFixed(2)}` : "0.00"}
                 </td>
@@ -392,7 +399,7 @@ function TradeHistoryTable({ accountId }: { accountId: string | null }) {
             disabled={page <= 1}
             className="px-1.5 py-0.5 rounded bg-secondary hover:bg-secondary/80 disabled:opacity-40"
           >
-            Prev
+            {t("pager.prev")}
           </button>
           <span className="text-muted-foreground">
             {page} / {totalPages}
@@ -402,7 +409,7 @@ function TradeHistoryTable({ accountId }: { accountId: string | null }) {
             disabled={page >= totalPages}
             className="px-1.5 py-0.5 rounded bg-secondary hover:bg-secondary/80 disabled:opacity-40"
           >
-            Next
+            {t("pager.next")}
           </button>
         </div>
       )}
@@ -412,6 +419,7 @@ function TradeHistoryTable({ accountId }: { accountId: string | null }) {
 
 // ── Economic Calendar ────────────────────────────────────────
 function EconomicCalendar() {
+  const t = useT();
   const [useTvCalendar, setUseTvCalendar] = useState(
     () => localStorage.getItem("tvEconCalendar") !== "false",
   );
@@ -438,7 +446,7 @@ function EconomicCalendar() {
               : "text-muted-foreground hover:bg-secondary",
           )}
         >
-          Sim Data
+          {t("calendar.sim")}
         </button>
         <button
           onClick={() => {
@@ -450,7 +458,7 @@ function EconomicCalendar() {
             useTvCalendar ? "bg-[#2962ff] text-white" : "text-muted-foreground hover:bg-secondary",
           )}
         >
-          TradingView Live
+          {t("calendar.tv")}
         </button>
       </div>
       {useTvCalendar ? (
@@ -465,13 +473,13 @@ function EconomicCalendar() {
         <table className="w-full text-[11px]">
           <thead className="sticky top-0 bg-card z-10">
             <tr>
-              <th>Time</th>
-              <th>Currency</th>
-              <th>Impact</th>
-              <th>Event</th>
-              <th>Forecast</th>
-              <th>Previous</th>
-              <th>Actual</th>
+              <th>{t("col.time")}</th>
+              <th>{t("col.currency")}</th>
+              <th>{t("col.impact")}</th>
+              <th>{t("col.event")}</th>
+              <th>{t("col.forecast")}</th>
+              <th>{t("col.previous")}</th>
+              <th>{t("col.actual")}</th>
             </tr>
           </thead>
           <tbody>
@@ -486,7 +494,7 @@ function EconomicCalendar() {
                       impactColor[ev.impact],
                     )}
                   >
-                    {ev.impact.toUpperCase()}
+                    {t(`impact.${ev.impact}`)}
                   </span>
                 </td>
                 <td>{ev.event}</td>
@@ -504,6 +512,7 @@ function EconomicCalendar() {
 
 // ── News Feed ────────────────────────────────────────────────
 function NewsFeed() {
+  const t = useT();
   const impactStyle = {
     bullish: "text-buy",
     bearish: "text-sell",
@@ -512,6 +521,7 @@ function NewsFeed() {
 
   return (
     <div className="divide-y divide-border/30">
+      <p className="px-3 py-1.5 text-[10px] text-muted-foreground/70">{t("news.placeholder")}</p>
       {MOCK_NEWS.map((item, i) => (
         <div key={i} className="px-3 py-2 hover:bg-secondary/30 cursor-pointer">
           <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-0.5">
@@ -519,7 +529,7 @@ function NewsFeed() {
             <span className="text-muted-foreground">|</span>
             <span>{item.source}</span>
             <span className={cn("font-semibold", impactStyle[item.impact])}>
-              {item.impact.toUpperCase()}
+              {t(`news.${item.impact}`)}
             </span>
           </div>
           <p className="text-xs leading-snug">{item.title}</p>

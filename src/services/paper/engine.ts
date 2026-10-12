@@ -1,22 +1,24 @@
 import type { Account, ClosedPosition, Fill, Order, Position } from "../schemas.ts";
 import { publish } from "./bus.ts";
-import { getDemoSymbol } from "./instruments.ts";
+import { getSymbolSpec } from "./symbols.ts";
+import { t } from "../../i18n/index.ts";
 
 /**
- * In-browser paper-trading engine. The single source of truth for the demo
- * account, positions and orders. Market orders fill instantly at the latest
- * replayed price; positions are marked-to-market on every tick. State is
- * ephemeral (memory only) — a refresh starts a fresh demo session.
+ * In-browser paper-trading engine. The single source of truth for the paper
+ * account, positions and orders. Prices come from the real market-data feed
+ * (Alpaca / IBKR via the local server), but nothing is ever sent to a broker:
+ * market orders fill instantly at the live quote (buys at the ask, sells at the
+ * bid) and positions are marked-to-market on every tick. State is ephemeral
+ * (memory only) — a refresh starts a fresh paper session.
  */
 
 const STARTING_BALANCE = 100_000;
-const DEFAULT_LEVERAGE = 100;
 
 const account: Account = {
   id: crypto.randomUUID(),
   userId: "demo-user",
   templateId: "demo",
-  label: "Demo Account",
+  label: "Paper Account",
   status: "ACTIVE",
   balance: STARTING_BALANCE,
   equity: STARTING_BALANCE,
@@ -27,14 +29,14 @@ const account: Account = {
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   isHftMode: false,
-  template: { name: "Demo Account", startingBalance: STARTING_BALANCE, instrumentType: "CRYPTO" },
+  template: { name: "Paper Account", startingBalance: STARTING_BALANCE, instrumentType: "EQUITIES" },
 };
 
 const positions: Position[] = [];
 const orders: Order[] = [];
 const closed: ClosedPosition[] = [];
 const fills: Fill[] = [];
-const lastPrice = new Map<string, number>();
+const quotes = new Map<string, { bid: number; ask: number }>();
 
 export function getAccount(): Account {
   return { ...account };
@@ -54,17 +56,30 @@ export function getClosedPositions(): ClosedPosition[] {
 export function getFills(): Fill[] {
   return fills.map((f) => ({ ...f }));
 }
+/** Latest mid price (0 until the first tick arrives). */
 export function getLastPrice(symbol: string): number {
-  return lastPrice.get(symbol) ?? 0;
+  const q = quotes.get(symbol);
+  return q ? (q.bid + q.ask) / 2 : 0;
+}
+
+/** Price a position would close at right now: longs sell at the bid, shorts buy at the ask. */
+function exitPrice(pos: Position): number {
+  const q = quotes.get(pos.symbolName);
+  if (!q) return pos.currentPrice ?? pos.entryPrice;
+  return pos.side === "LONG" ? q.bid : q.ask;
+}
+
+function leverageOf(symbol: string): number {
+  return getSymbolSpec(symbol)?.maxLeverage || 1;
 }
 
 function notional(symbol: string, qty: number, price: number): number {
-  const contractSize = getDemoSymbol(symbol)?.contractSize ?? 1;
+  const contractSize = getSymbolSpec(symbol)?.contractSize ?? 1;
   return price * qty * contractSize;
 }
 
 function pnlOf(pos: Position, price: number): number {
-  const contractSize = getDemoSymbol(pos.symbolName)?.contractSize ?? 1;
+  const contractSize = getSymbolSpec(pos.symbolName)?.contractSize ?? 1;
   const dir = pos.side === "LONG" ? 1 : -1;
   return (price - pos.entryPrice) * pos.quantity * contractSize * dir;
 }
@@ -73,7 +88,7 @@ function recomputeEquity(): void {
   let unrealized = 0;
   let margin = 0;
   for (const p of positions) {
-    const price = lastPrice.get(p.symbolName) ?? p.entryPrice;
+    const price = exitPrice(p);
     p.currentPrice = price;
     p.unrealizedPnl = pnlOf(p, price);
     unrealized += p.unrealizedPnl;
@@ -107,8 +122,8 @@ function openPosition(symbol: string, side: string, qty: number, price: number, 
     entryPrice: price,
     currentPrice: price,
     unrealizedPnl: 0,
-    margin: notional(symbol, qty, price) / DEFAULT_LEVERAGE,
-    contractSize: getDemoSymbol(symbol)?.contractSize ?? 1,
+    margin: notional(symbol, qty, price) / leverageOf(symbol),
+    contractSize: getSymbolSpec(symbol)?.contractSize ?? 1,
     openedAt: new Date().toISOString(),
     takeProfit: tp ?? null,
     stopLoss: sl ?? null,
@@ -152,9 +167,19 @@ export type PlaceOrderArgs = {
   stopLoss?: number;
 };
 
-/** Market orders fill instantly at the latest price; an open position is created. */
+/**
+ * Market orders fill instantly at the live quote (BUY at the ask, SELL at the bid);
+ * limit/stop tickets still fill immediately at their requested price (no resting book).
+ */
 export function placeOrder(input: PlaceOrderArgs): Order {
-  const price = input.price ?? lastPrice.get(input.symbol) ?? 0;
+  const q = quotes.get(input.symbol);
+  const market = q ? (input.side === "BUY" ? q.ask : q.bid) : 0;
+  const price = input.type === "MARKET" || input.price == null ? market : input.price;
+  if (!(price > 0)) throw new Error(t("err.noPrice", { symbol: input.symbol }));
+  const margin = notional(input.symbol, input.quantity, price) / leverageOf(input.symbol);
+  if (margin > account.freeMargin) {
+    throw new Error(t("err.margin", { need: margin.toFixed(2), free: account.freeMargin.toFixed(2) }));
+  }
   const order = makeFilledOrder(input, price);
   orders.unshift(order);
   publish("orders", { eventType: "OrderPlaced", accountId: account.id, orderId: order.id, _entity: { ...order } });
@@ -200,7 +225,7 @@ export function closePosition(positionId: string, quantity?: number): { success:
   const idx = positions.findIndex((p) => p.id === positionId);
   if (idx < 0) return { success: false };
   const pos = positions[idx]!;
-  const price = lastPrice.get(pos.symbolName) ?? pos.entryPrice;
+  const price = exitPrice(pos);
   const qty = quantity && quantity < pos.quantity ? quantity : pos.quantity;
   const realized = pnlOf({ ...pos, quantity: qty }, price);
   account.balance += realized;
@@ -254,12 +279,13 @@ function checkStops(pos: Position, price: number): boolean {
   return hitTp || hitSl;
 }
 
-/** Called by the feed on every replayed tick: marks positions, fires SL/TP. */
-export function mark(symbol: string, price: number): void {
-  lastPrice.set(symbol, price);
+/** Called by the market-data client on every live quote: marks positions, fires SL/TP. */
+export function mark(symbol: string, bid: number, ask: number): void {
+  quotes.set(symbol, { bid, ask });
   const affected = positions.filter((p) => p.symbolName === symbol);
   if (affected.length === 0) return;
   for (const pos of affected) {
+    const price = exitPrice(pos);
     if (checkStops(pos, price)) {
       closePosition(pos.id);
       continue;

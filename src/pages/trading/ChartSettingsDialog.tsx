@@ -13,6 +13,7 @@ import { type ChartPreferences, updateChartPreferences } from "../../hooks/useCh
 import { useDragOffset } from "../../hooks/useDragOffset.ts";
 import { cn } from "../../lib/utils.ts";
 import { CHART_COLORS, type ChartColors } from "./constants.ts";
+import { useT, useTx } from "../../i18n/index.ts";
 
 // ── Chart Settings dialog ─────────────────────────────────────────────────────
 // Opened from the chart context menu. Every control writes straight through
@@ -115,11 +116,12 @@ function ToggleRow({
   disabled?: boolean;
   onChange: (v: boolean) => void;
 }) {
+  const tx = useTx("cs");
   return (
     <div className={cn("flex items-center justify-between gap-4 py-2", disabled && "opacity-40")}>
       <div className="min-w-0">
-        <div className="text-xs text-foreground">{label}</div>
-        {hint && <div className="text-[10px] text-muted-foreground">{hint}</div>}
+        <div className="text-xs text-foreground">{tx(label)}</div>
+        {hint && <div className="text-[10px] text-muted-foreground">{tx(hint)}</div>}
       </div>
       <Switch checked={checked} onChange={disabled ? () => undefined : onChange} />
     </div>
@@ -157,9 +159,11 @@ function ColorRow({
   fallback: string;
   onChange: (v: string) => void;
 }) {
+  const tx = useTx("cs");
+  const t = useT();
   return (
     <div className="flex items-center justify-between gap-4 py-2">
-      <div className="text-xs text-foreground">{label}</div>
+      <div className="text-xs text-foreground">{tx(label)}</div>
       <div className="flex items-center gap-2">
         <ColorSwatch value={value} fallback={fallback} onChange={onChange} />
         {value && (
@@ -167,7 +171,7 @@ function ColorRow({
             onClick={() => onChange("")}
             className="text-[10px] text-muted-foreground hover:text-foreground"
           >
-            Reset
+            {t("cs.reset")}
           </button>
         )}
       </div>
@@ -185,9 +189,10 @@ function ColorPairRow({
   a: { value: string; fallback: string; onChange: (v: string) => void };
   b: { value: string; fallback: string; onChange: (v: string) => void };
 }) {
+  const tx = useTx("cs");
   return (
     <div className="flex items-center justify-between gap-4 py-2">
-      <div className="text-xs text-foreground">{label}</div>
+      <div className="text-xs text-foreground">{tx(label)}</div>
       <div className="flex items-center gap-1.5">
         <ColorSwatch {...a} />
         <ColorSwatch {...b} />
@@ -197,9 +202,10 @@ function ColorPairRow({
 }
 
 function SectionTitle({ children }: { children: ReactNode }) {
+  const tx = useTx("cs");
   return (
     <div className="mb-1 mt-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground first:mt-0">
-      {children}
+      {typeof children === "string" ? tx(children) : children}
     </div>
   );
 }
@@ -394,6 +400,7 @@ function EventsTab({
   onOpenNewsConfig: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   return (
     <div>
       <SectionTitle>Sessions</SectionTitle>
@@ -419,11 +426,10 @@ function EventsTab({
         }}
         className="mt-1 rounded border border-border px-3 py-1.5 text-xs text-foreground hover:bg-secondary"
       >
-        Configure news overlay…
+        {t("cs.newsConfig")}
       </button>
       <p className="mt-2 text-[10px] text-muted-foreground">
-        Impact filter, event markers and no-trade window shading are configured in the news overlay
-        dialog.
+        {t("cs.newsHint")}
       </p>
     </div>
   );
@@ -498,6 +504,8 @@ export function ChartSettingsDialog(props: ChartSettingsDialogProps) {
   const { open, onClose } = props;
   const [tab, setTab] = useState<TabId>("appearance");
   const drag = useDragOffset();
+  const t = useT();
+  const tx = useTx("cs");
   if (!open) return null;
 
   const close = () => {
@@ -523,7 +531,7 @@ export function ChartSettingsDialog(props: ChartSettingsDialogProps) {
         >
           <div className="flex items-center gap-1.5">
             <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60" />
-            <h2 className="text-sm font-semibold text-foreground">Chart Settings</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t("cs.title")}</h2>
           </div>
           <button onClick={close} className="text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
@@ -531,19 +539,19 @@ export function ChartSettingsDialog(props: ChartSettingsDialogProps) {
         </div>
         <div className="flex min-h-0 flex-1">
           <div className="w-36 shrink-0 border-r border-border p-2">
-            {TABS.map((t) => (
+            {TABS.map((tb) => (
               <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
+                key={tb.id}
+                onClick={() => setTab(tb.id)}
                 className={cn(
                   "flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs transition-colors",
-                  tab === t.id
+                  tab === tb.id
                     ? "bg-primary/15 text-primary"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground",
                 )}
               >
-                {t.icon}
-                {t.label}
+                {tb.icon}
+                {tx(tb.label)}
               </button>
             ))}
           </div>
@@ -559,7 +567,7 @@ export function ChartSettingsDialog(props: ChartSettingsDialogProps) {
               className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
             >
               <RotateCcw className="h-3 w-3" />
-              Reset to defaults
+              {t("cs.resetDefaults")}
             </button>
           ) : (
             <span />
@@ -568,7 +576,7 @@ export function ChartSettingsDialog(props: ChartSettingsDialogProps) {
             onClick={close}
             className="rounded bg-secondary px-3 py-1 text-xs text-foreground hover:bg-secondary/70"
           >
-            Ok
+            {t("cs.ok")}
           </button>
         </div>
       </div>

@@ -25,6 +25,7 @@ import { useEffect, useRef, useState } from "react";
 import { useDragOffset } from "../../hooks/useDragOffset.ts";
 import { cn } from "../../lib/utils.ts";
 import type { DrawingTool } from "./constants.ts";
+import { useT } from "../../i18n/index.ts";
 
 interface ToolMeta {
   tool: DrawingTool;
@@ -126,25 +127,26 @@ function RailGroup({
   onToggle: () => void;
   onSelect: (t: DrawingTool) => void;
 }) {
-  const activeMeta = group.tools.find((t) => t.tool === activeTool);
+  const t = useT();
+  const activeMeta = group.tools.find((x) => x.tool === activeTool);
   const Icon = activeMeta?.icon ?? group.icon;
   return (
     <div className="relative">
-      <RailButton icon={Icon} title={group.label} active={Boolean(activeMeta)} onClick={onToggle} />
+      <RailButton icon={Icon} title={t(`railGroup.${group.id}`)} active={Boolean(activeMeta)} onClick={onToggle} />
       {open && (
         <div className="absolute left-full top-0 ml-1 z-30 min-w-[180px] rounded-md bg-card border border-border shadow-xl py-1">
-          {group.tools.map((t) => (
+          {group.tools.map((x) => (
             <button
-              key={t.tool}
+              key={x.tool}
               type="button"
-              onClick={() => onSelect(t.tool)}
+              onClick={() => onSelect(x.tool)}
               className={cn(
                 "w-full flex items-center gap-2.5 px-3 py-1.5 text-sm hover:bg-secondary text-left",
-                activeTool === t.tool && "bg-secondary text-primary",
+                activeTool === x.tool && "bg-secondary text-primary",
               )}
             >
-              <t.icon className="h-3.5 w-3.5 shrink-0" />
-              {t.label}
+              <x.icon className="h-3.5 w-3.5 shrink-0" />
+              {t(`tool.${x.tool}`)}
             </button>
           ))}
         </div>
@@ -160,6 +162,7 @@ export function DrawingToolRail({
   drawingTool: DrawingTool;
   onDrawingTool: (t: DrawingTool) => void;
 }) {
+  const t = useT();
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [hidden, setHidden] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -174,8 +177,8 @@ export function DrawingToolRail({
     return () => document.removeEventListener("mousedown", handler);
   }, [openGroup]);
 
-  const select = (t: DrawingTool) => {
-    onDrawingTool(drawingTool === t ? "none" : t);
+  const select = (tool: DrawingTool) => {
+    onDrawingTool(drawingTool === tool ? "none" : tool);
     setOpenGroup(null);
   };
 
@@ -189,7 +192,7 @@ export function DrawingToolRail({
     return (
       <button
         type="button"
-        title="Show drawing tools"
+        title={t("rail.show")}
         onClick={() => setHidden(false)}
         style={drag.style}
         className="absolute left-1 top-1 z-20 rounded-md border border-border bg-card/90 p-1.5 text-muted-foreground backdrop-blur-sm hover:text-primary"
@@ -207,14 +210,14 @@ export function DrawingToolRail({
     >
       <div
         onPointerDown={drag.onPointerDown}
-        title="Drag to move"
+        title={t("rail.drag")}
         className="flex w-full cursor-move justify-center py-0.5 text-muted-foreground/50 hover:text-muted-foreground"
       >
         <GripVertical className="h-3.5 w-3.5" />
       </div>
       <RailButton
         icon={MousePointer2}
-        title="Cursor"
+        title={t("rail.cursor")}
         active={drawingTool === "none"}
         onClick={() => {
           onDrawingTool("none");
@@ -232,7 +235,7 @@ export function DrawingToolRail({
         />
       ))}
       <div className="my-0.5 w-full border-t border-border/50" />
-      <RailButton icon={EyeOff} title="Hide toolbar" onClick={hide} />
+      <RailButton icon={EyeOff} title={t("rail.hide")} onClick={hide} />
     </div>
   );
 }

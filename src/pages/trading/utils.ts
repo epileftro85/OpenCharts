@@ -2,23 +2,28 @@ import type { CandlestickData, Time } from "lightweight-charts";
 import type { CandleData } from "../../lib/indicators.ts";
 import { KNOWN_CURRENCIES } from "./constants.ts";
 import type { Timeframe } from "./constants.ts";
+import { getSymbolSpec } from "../../services/paper/symbols.ts";
 
 /** Derive pip (decimal) precision from symbolInfo.tickSize or symbol name */
 export function getPipDigits(
   symbolInfo?: { tickSize?: number | string },
   symbolName?: string,
 ): number {
-  const symbolDecimals = _symbolNameDecimals(symbolName);
+  // The market-data server sends the instrument's real tick size (0.01 for
+  // stocks, 0.00001 for forex majors…), so it wins over name-based guessing.
   if (symbolInfo?.tickSize) {
     const s = String(symbolInfo.tickSize);
     const tickDecimals = s.includes(".")
       ? s.split(".")[1]!.replace(/0+$/, "").length || s.split(".")[1]!.length
       : 0;
-    // Use the higher of tick-derived or symbol-name-derived so forex pairs
-    // (tickSize=0.0001) still show 5 decimal places instead of 4.
-    return Math.max(tickDecimals, symbolDecimals, 2);
+    return Math.max(tickDecimals, 2);
   }
-  return symbolDecimals;
+  return _symbolNameDecimals(symbolName);
+}
+
+/** Price decimals for an instrument known to the terminal (watchlist / search results). */
+export function symbolDigits(symbolName: string): number {
+  return getPipDigits(getSymbolSpec(symbolName), symbolName);
 }
 
 function _symbolNameDecimals(symbolName?: string): number {
@@ -96,4 +101,31 @@ export function getCandleBucketTime(timestampMs: number, tf: Timeframe): number 
   };
   const ms = intervals[tf];
   return Math.floor((Math.floor(timestampMs / ms) * ms) / 1000);
+}
+
+/**
+ * Bucket for a live tick, anchored on the chart's last bar instead of the clock.
+ * Stock bars follow the session (hourly bars at 9:30, 10:30…; 4h at 9:30 and
+ * 13:30 New York; daily/weekly at the trading date), so counting whole bar
+ * intervals from the last bar keeps live candles aligned with the history.
+ */
+export function getAnchoredBucketTime(lastBarSec: number, timestampMs: number, tf: Timeframe): number {
+  const step = intervalSec(tf);
+  const t = Math.floor(timestampMs / 1000);
+  if (t < lastBarSec) return lastBarSec;
+  return lastBarSec + Math.floor((t - lastBarSec) / step) * step;
+}
+
+function intervalSec(tf: Timeframe): number {
+  const SEC: Record<Timeframe, number> = {
+    "1m": 60,
+    "5m": 300,
+    "15m": 900,
+    "30m": 1800,
+    "1h": 3600,
+    "4h": 14400,
+    "1d": 86400,
+    "1w": 604800,
+  };
+  return SEC[tf];
 }

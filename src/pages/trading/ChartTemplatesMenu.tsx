@@ -15,6 +15,7 @@ import {
   chartTemplatesApi,
 } from "../../services/api/chart-templates.ts";
 import { toast } from "../../services/toast.ts";
+import { t as translateNow, useT } from "../../i18n/index.ts";
 
 // ── Chart templates (TradingView/TradeLocker-style layout templates) ─────────
 // Save/load named snapshots of chart appearance (colors, element visibility,
@@ -65,12 +66,12 @@ function useChartTemplates() {
     mutationFn: (vars: { name: string; content: ChartTemplateContent }) =>
       chartTemplatesApi.save(vars.name, vars.content),
     onSuccess: invalidate,
-    onError: () => toast.error("Templates", "Failed to save template"),
+    onError: () => toast.error(translateNow("tpl.toast"), translateNow("tpl.saveFailed")),
   });
   const remove = useMutation({
     mutationFn: (id: string) => chartTemplatesApi.remove(id),
     onSuccess: invalidate,
-    onError: () => toast.error("Templates", "Failed to delete template"),
+    onError: () => toast.error(translateNow("tpl.toast"), translateNow("tpl.deleteFailed")),
   });
   return { templates, save, remove };
 }
@@ -135,11 +136,12 @@ function MenuRow({
 }
 
 function AutosaveRow({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+  const t = useT();
   return (
     <div className="flex items-center justify-between px-3 py-1.5">
       <div className="flex items-center gap-2 text-xs text-foreground">
         <CloudUpload className="h-3.5 w-3.5 text-muted-foreground" />
-        Autosave
+        {t("tpl.autosave")}
       </div>
       <button
         type="button"
@@ -163,13 +165,14 @@ function AutosaveRow({ enabled, onToggle }: { enabled: boolean; onToggle: () => 
 }
 
 function AddTemplateRow({ onAdd }: { onAdd: (name: string) => void }) {
+  const t = useT();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   if (!adding) {
     return (
       <MenuRow
         icon={<Plus className="h-3.5 w-3.5" />}
-        label="Add template"
+        label={t("tpl.add")}
         onClick={() => setAdding(true)}
       />
     );
@@ -191,7 +194,7 @@ function AddTemplateRow({ onAdd }: { onAdd: (name: string) => void }) {
           if (e.key === "Escape") setAdding(false);
         }}
         onBlur={commit}
-        placeholder="Template name…"
+        placeholder={t("tpl.namePlaceholder")}
         className="w-full rounded border border-border bg-transparent px-2 py-1 text-xs text-foreground outline-none focus:border-primary"
       />
     </div>
@@ -211,26 +214,27 @@ function TemplateList({
   onApply: (t: ChartTemplate) => void;
   onDelete: (t: ChartTemplate) => void;
 }) {
+  const t = useT();
   if (templates.length === 0) {
-    return <div className="px-3 py-2 text-[11px] text-muted-foreground">No templates yet</div>;
+    return <div className="px-3 py-2 text-[11px] text-muted-foreground">{t("tpl.empty")}</div>;
   }
   return (
     <>
-      {templates.map((t) => (
-        <div key={t.id} className="group flex items-center">
+      {templates.map((tpl) => (
+        <div key={tpl.id} className="group flex items-center">
           <button
-            onClick={() => onApply(t)}
+            onClick={() => onApply(tpl)}
             className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
           >
             <span className="flex h-3.5 w-3.5 items-center justify-center text-primary">
-              {t.name === activeName && <Check className="h-3.5 w-3.5" />}
+              {tpl.name === activeName && <Check className="h-3.5 w-3.5" />}
             </span>
-            <span className="truncate">{t.name}</span>
+            <span className="truncate">{tpl.name}</span>
           </button>
           {manageMode && (
             <button
-              onClick={() => onDelete(t)}
-              title={`Delete "${t.name}"`}
+              onClick={() => onDelete(tpl)}
+              title={t("tpl.deleteNamed", { name: tpl.name })}
               className="px-2 text-red-400/70 hover:text-red-400"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -244,6 +248,7 @@ function TemplateList({
 
 export function ChartTemplatesMenu(props: ChartTemplatesMenuProps) {
   const { activeIndicators, onSetIndicators, activePlugins, onSetPlugins } = props;
+  const t = useT();
   const prefs = useChartPreferences();
   const { templates, save, remove } = useChartTemplates();
   const [open, setOpen] = useState(false);
@@ -261,39 +266,39 @@ export function ChartTemplatesMenu(props: ChartTemplatesMenuProps) {
   );
   useTemplateAutosave(autosave, activeName, content, saveFn);
 
-  const applyTemplate = (t: ChartTemplate) => {
-    const c = t.panels[0];
+  const applyTemplate = (tpl: ChartTemplate) => {
+    const c = tpl.panels[0];
     if (!c) return;
-    updateChartPreferences({ ...contentToPrefsPatch(c), activeChartTemplate: t.name });
+    updateChartPreferences({ ...contentToPrefsPatch(c), activeChartTemplate: tpl.name });
     onSetIndicators((c.indicators ?? []) as IndicatorType[]);
     onSetPlugins(c.plugins ?? []);
     setOpen(false);
-    toast.info("Templates", `Loaded "${t.name}"`);
+    toast.info(t("tpl.toast"), t("tpl.loaded", { name: tpl.name }));
   };
 
   const addTemplate = (name: string) => {
     save.mutate({ name, content });
     updateChartPreferences({ activeChartTemplate: name });
-    toast.success("Templates", `Saved "${name}"`);
+    toast.success(t("tpl.toast"), t("tpl.saved", { name }));
   };
 
-  const deleteTemplate = (t: ChartTemplate) => {
-    remove.mutate(t.id);
-    if (t.name === activeName) updateChartPreferences({ activeChartTemplate: "" });
+  const deleteTemplate = (tpl: ChartTemplate) => {
+    remove.mutate(tpl.id);
+    if (tpl.name === activeName) updateChartPreferences({ activeChartTemplate: "" });
   };
 
   return (
     <div className="relative hidden md:block">
       <button
         onClick={() => setOpen((v) => !v)}
-        title="Chart layout templates"
+        title={t("tpl.title")}
         className={cn(
           "flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors",
           open ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
         )}
       >
         <CloudUpload className="h-3.5 w-3.5" />
-        <span className="hidden max-w-[110px] truncate lg:inline">{activeName || "Templates"}</span>
+        <span className="hidden max-w-[110px] truncate lg:inline">{activeName || t("tpl.button")}</span>
         <ChevronDown className={cn("h-3 w-3 transition-transform", open && "rotate-180")} />
       </button>
 
@@ -302,7 +307,7 @@ export function ChartTemplatesMenu(props: ChartTemplatesMenuProps) {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full z-50 mt-1 w-60 rounded-lg border border-border bg-card/95 py-1 shadow-2xl backdrop-blur-xl">
             <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Layout templates
+              {t("tpl.header")}
             </div>
             <AutosaveRow
               enabled={autosave}
@@ -311,21 +316,21 @@ export function ChartTemplatesMenu(props: ChartTemplatesMenuProps) {
             <AddTemplateRow onAdd={addTemplate} />
             <MenuRow
               icon={<Save className="h-3.5 w-3.5" />}
-              label={activeName ? `Save "${activeName}"` : "Save template"}
+              label={activeName ? t("tpl.saveNamed", { name: activeName }) : t("tpl.save")}
               disabled={!activeName || autosave}
               onClick={() => {
                 save.mutate({ name: activeName, content });
-                toast.success("Templates", `Saved "${activeName}"`);
+                toast.success(t("tpl.toast"), t("tpl.saved", { name: activeName }));
               }}
             />
             <MenuRow
               icon={<Trash2 className="h-3.5 w-3.5" />}
-              label={manageMode ? "Done managing" : "Manage templates…"}
+              label={manageMode ? t("tpl.doneManaging") : t("tpl.manage")}
               onClick={() => setManageMode((v) => !v)}
             />
             <div className="my-1 border-t border-border" />
             <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Recently used
+              {t("tpl.recent")}
             </div>
             <div className="max-h-48 overflow-y-auto">
               <TemplateList

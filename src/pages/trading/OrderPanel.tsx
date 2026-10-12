@@ -17,6 +17,8 @@ import { DisconnectedTradingBanner } from "../../components/ConnectionIndicator.
 import type { PlaceOrderInput } from "../../services/schemas.ts";
 import { toast } from "../../services/toast.ts";
 import { formatCurrency, formatNumber, cn } from "../../lib/utils.ts";
+import { getPipDigits } from "./utils.ts";
+import { useT } from "../../i18n/index.ts";
 
 type ConfirmableOrder = PlaceOrderInput & { _submit: () => Promise<unknown> };
 
@@ -26,6 +28,7 @@ export interface OrderPanelProps {
     name?: string;
     description?: string;
     pipSize?: number;
+    tickSize?: number;
     pricescale?: number;
     contractSize?: number;
     marginPercent?: number;
@@ -59,6 +62,8 @@ export function OrderPanel({
   onOrderSuccess,
 }: OrderPanelProps) {
   const isDemo = useAuthStore((s) => s.isDemo);
+  const priceDigits = getPipDigits(symbolInfo, symbol);
+  const t = useT();
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "STOP">("MARKET");
   const [quantity, setQuantity] = useState(() => {
@@ -79,31 +84,31 @@ export function OrderPanel({
 
   const handleSubmit = () => {
     if (!isFeedConnected) {
-      toast.warning("No Data Feed", "Cannot place orders while disconnected from the data feed");
+      toast.warning(t("toast.noFeed"), t("toast.noFeed.order"));
       return;
     }
     if (!accountId) {
-      toast.warning("No Account", "Please select a trading account first");
+      toast.warning(t("toast.noAccount"), t("toast.noAccount.desc"));
       return;
     }
     const qty = parseFloat(quantity);
     if (isNaN(qty) || qty <= 0) {
-      toast.warning("Invalid Quantity", "Quantity must be a positive number");
+      toast.warning(t("toast.invalidQty"), t("toast.invalidQty.positive"));
       return;
     }
     if (qty > 1000) {
-      toast.warning("Invalid Quantity", "Maximum quantity is 1000 lots");
+      toast.warning(t("toast.invalidQty"), t("toast.invalidQty.max"));
       return;
     }
     if (orderType === "LIMIT" && (!price || isNaN(parseFloat(price)) || parseFloat(price) <= 0)) {
-      toast.warning("Missing Price", "Limit orders require a valid price");
+      toast.warning(t("toast.missingPrice"), t("toast.missingPrice.desc"));
       return;
     }
     if (
       orderType === "STOP" &&
       (!stopPrice || isNaN(parseFloat(stopPrice)) || parseFloat(stopPrice) <= 0)
     ) {
-      toast.warning("Missing Stop Price", "Stop orders require a valid stop price");
+      toast.warning(t("toast.missingStop"), t("toast.missingStop.desc"));
       return;
     }
     const effectiveType = orderType;
@@ -124,7 +129,7 @@ export function OrderPanel({
     const doSubmit = () =>
       placeOrder.mutateAsync(input, {
         onSuccess: () => {
-          toast.success("Order Sent", `${side} ${qty} ${symbol} (${effectiveType})`);
+          toast.success(t("toast.orderSent"), `${t(`side.${side}`)} ${qty} ${symbol} (${t(`orderType.${effectiveType}`)})`);
           onOrderSuccess?.();
         },
         onError: (err: unknown) => {
@@ -134,18 +139,15 @@ export function OrderPanel({
             code?: string;
           };
           const code = e?.error?.code ?? e?.code;
-          const msg = e?.error?.message || e?.message || "Failed to place order";
+          const msg = e?.error?.message || e?.message || t("toast.failedPlace");
           if (code === "ACCOUNT_PASSED") {
             toast.success("Account Passed!", msg);
           } else if (code === "ACCOUNT_FAILED") {
             toast.error("Account Failed", msg);
           } else if (code === "REQUEST_TIMEOUT") {
-            toast.error(
-              "Order Timed Out",
-              "The server didn't respond in time. Check your connection and try again.",
-            );
+            toast.error(t("toast.orderTimeout"), t("toast.orderTimeout.desc"));
           } else {
-            toast.error("Order Failed", msg);
+            toast.error(t("toast.orderFailed"), msg);
           }
         },
       });
@@ -180,7 +182,7 @@ export function OrderPanel({
     <div className="flex flex-col h-full" data-testid="order-form">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-secondary">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          New Order
+          {t("order.title")}
         </h3>
         <div className="flex items-center gap-2">
           <button
@@ -191,7 +193,7 @@ export function OrderPanel({
                 ? "bg-accent/15 text-accent border-accent/30"
                 : "text-muted-foreground border-border hover:bg-secondary",
             )}
-            title={soundMuted ? "Unmute trade sounds" : "Mute trade sounds"}
+            title={soundMuted ? t("order.unmute") : t("order.mute")}
           >
             {soundMuted ? <VolumeX className="h-2.5 w-2.5" /> : <Volume2 className="h-2.5 w-2.5" />}
           </button>
@@ -203,10 +205,10 @@ export function OrderPanel({
                 ? "bg-buy/15 text-buy border-buy/30"
                 : "text-muted-foreground border-border hover:bg-secondary",
             )}
-            title="One-click trading: skip confirmation for market orders"
+            title={t("order.oneClick.title")}
           >
             <Zap className="h-2.5 w-2.5" />
-            1-Click
+            {t("order.oneClick")}
           </button>
           <span className="text-xs font-semibold">{symbol}</span>
         </div>
@@ -222,7 +224,7 @@ export function OrderPanel({
             className="text-xs"
           >
             <TrendingUp className="h-3 w-3 mr-1" />
-            BUY {tick ? formatNumber(tick.ask, 5) : ""}
+            {t("side.BUY")} {tick ? formatNumber(tick.ask, priceDigits) : ""}
           </Button>
           <Button
             variant={side === "SELL" ? "sell" : "outline"}
@@ -231,28 +233,28 @@ export function OrderPanel({
             className="text-xs"
           >
             <TrendingDown className="h-3 w-3 mr-1" />
-            SELL {tick ? formatNumber(tick.bid, 5) : ""}
+            {t("side.SELL")} {tick ? formatNumber(tick.bid, priceDigits) : ""}
           </Button>
         </div>
 
         {/* Order Type */}
         <div>
           <label className="text-[10px] text-muted-foreground uppercase tracking-wider">
-            Order Type
+            {t("order.type")}
           </label>
           <div className="grid grid-cols-3 gap-1 mt-1">
-            {(["MARKET", "LIMIT", "STOP"] as const).map((t) => (
+            {(["MARKET", "LIMIT", "STOP"] as const).map((ot) => (
               <button
-                key={t}
-                onClick={() => setOrderType(t)}
+                key={ot}
+                onClick={() => setOrderType(ot)}
                 className={cn(
                   "px-1 py-1 text-[10px] rounded border border-border",
-                  t === orderType
+                  ot === orderType
                     ? "bg-primary text-primary-foreground border-primary"
                     : "hover:bg-secondary",
                 )}
               >
-                {t.replace("_", " ")}
+                {t(`orderType.${ot}`)}
               </button>
             ))}
           </div>
@@ -261,7 +263,7 @@ export function OrderPanel({
         {/* Quantity */}
         <div>
           <label className="text-[10px] text-muted-foreground uppercase tracking-wider">
-            Volume (lots)
+            {t("order.volume")}
           </label>
           <div className="flex items-center gap-1 mt-1">
             <button
@@ -306,13 +308,13 @@ export function OrderPanel({
         {orderType === "LIMIT" && (
           <div>
             <label className="text-[10px] text-muted-foreground uppercase tracking-wider">
-              Price
+              {t("order.price")}
             </label>
             <input
               type="number"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              placeholder={tick ? formatNumber(side === "BUY" ? tick.ask : tick.bid, 5) : ""}
+              placeholder={tick ? formatNumber(side === "BUY" ? tick.ask : tick.bid, priceDigits) : ""}
               className="w-full mt-1 text-sm font-mono"
               step="0.00001"
             />
@@ -322,7 +324,7 @@ export function OrderPanel({
         {orderType === "STOP" && (
           <div>
             <label className="text-[10px] text-muted-foreground uppercase tracking-wider">
-              Stop Price
+              {t("order.stopPrice")}
             </label>
             <input
               type="number"
@@ -338,7 +340,7 @@ export function OrderPanel({
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="text-[10px] text-muted-foreground uppercase tracking-wider">
-              Take Profit
+              {t("order.takeProfit")}
             </label>
             <input
               type="number"
@@ -350,7 +352,7 @@ export function OrderPanel({
           </div>
           <div>
             <label className="text-[10px] text-muted-foreground uppercase tracking-wider">
-              Stop Loss
+              {t("order.stopLoss")}
             </label>
             <input
               type="number"
@@ -387,30 +389,30 @@ export function OrderPanel({
               <div className="flex items-center gap-1 mb-1">
                 <AlertTriangle className={cn("h-3 w-3", riskColor)} />
                 <span className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Risk Analysis
+                  {t("order.risk")}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Risk Amount</span>
+                <span className="text-muted-foreground">{t("order.riskAmount")}</span>
                 <span className={cn("font-mono font-semibold", riskColor)}>
                   {formatCurrency(riskDollar)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Risk % of Balance</span>
+                <span className="text-muted-foreground">{t("order.riskPct")}</span>
                 <span className={cn("font-mono font-semibold", riskColor)}>
                   {riskPct.toFixed(2)}%
                 </span>
               </div>
               {tpDollar != null && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Reward</span>
+                  <span className="text-muted-foreground">{t("order.reward")}</span>
                   <span className="font-mono text-buy">{formatCurrency(tpDollar)}</span>
                 </div>
               )}
               {rrRatio != null && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">R:R Ratio</span>
+                  <span className="text-muted-foreground">{t("order.rr")}</span>
                   <span
                     className={cn(
                       "font-mono font-semibold",
@@ -424,7 +426,7 @@ export function OrderPanel({
               {riskPct > 5 && (
                 <div className="text-destructive text-[9px] flex items-center gap-1 mt-1">
                   <AlertTriangle className="h-2.5 w-2.5" />
-                  High risk — exceeds 5% of balance
+                  {t("order.highRisk")}
                 </div>
               )}
             </div>
@@ -435,11 +437,11 @@ export function OrderPanel({
         {symbolInfo && tick && (
           <div className="bg-secondary rounded p-2 text-[10px] space-y-1">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Contract Size</span>
+              <span className="text-muted-foreground">{t("order.contractSize")}</span>
               <span>{symbolInfo.contractSize?.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Margin Required</span>
+              <span className="text-muted-foreground">{t("order.margin")}</span>
               <span>
                 {formatCurrency(
                   (parseFloat(quantity) || 0) *
@@ -450,7 +452,7 @@ export function OrderPanel({
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Commission</span>
+              <span className="text-muted-foreground">{t("order.commission")}</span>
               <span>
                 {formatCurrency((symbolInfo.commission ?? 0) * (parseFloat(quantity) || 0))}
               </span>
@@ -461,10 +463,10 @@ export function OrderPanel({
         {isDemo && (
           <div className="bg-amber-500/10 border border-amber-500/30 rounded p-2 text-center">
             <p className="text-amber-400 text-[10px] font-semibold uppercase tracking-wider">
-              Demo Mode
+              {t("order.demo")}
             </p>
             <p className="text-muted-foreground text-[10px] mt-0.5">
-              Trading is disabled in demo mode
+              {t("order.demo.desc")}
             </p>
           </div>
         )}
@@ -477,22 +479,23 @@ export function OrderPanel({
           disabled={!accountId || placeOrder.isPending || isDemo || !isFeedConnected}
         >
           {isDemo
-            ? "Demo — Trading Disabled"
+            ? t("order.btn.demo")
             : !isFeedConnected
-              ? "Disconnected — Trading Disabled"
+              ? t("order.btn.disconnected")
               : placeOrder.isPending
-                ? "Placing…"
-                : `${side === "BUY" ? "Buy" : "Sell"} ${quantity} ${symbol}`}
+                ? t("order.btn.placing")
+                : t(side === "BUY" ? "order.btn.buy" : "order.btn.sell", { qty: quantity, symbol })}
         </Button>
 
         {placeOrder.isError && (
           <p className="text-destructive text-xs mt-1 p-1.5 bg-destructive/10 rounded">
-            {(placeOrder.error as { message?: string } | null)?.message || "Order failed"}
+            {(placeOrder.error as { message?: string } | null)?.message || t("order.failed")}
           </p>
         )}
         {placeOrder.isSuccess && (
-          <p className="text-buy text-xs mt-1 p-1.5 bg-buy/10 rounded">Order placed successfully</p>
+          <p className="text-buy text-xs mt-1 p-1.5 bg-buy/10 rounded">{t("order.placed")}</p>
         )}
+        <p className="text-[10px] text-muted-foreground/70 text-center">{t("order.paperNote")}</p>
       </div>
     </div>
   );
