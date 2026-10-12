@@ -2,31 +2,36 @@
 
 # 📈 OpenCharts
 
-**An open-source trading terminal that runs entirely in your browser — no backend to run, no signup, no API keys.**
+**An open-source trading terminal for learning: real market data from Alpaca or Interactive Brokers, paper trading in the browser, and market-structure tools with a bilingual guide.**
 
-Advanced charting · full drawing-tool suite · 8 indicators · watchlist · depth-of-market · order ticket · built-in paper-trading engine, seeded with **real** market history.
+Advanced charting · drawing tools · indicators · market structure (HH/HL/LH/LL, BOS/CHoCH, FVG, order blocks, liquidity) · 4-timeframe view · watchlist · order ticket · **paper-only** trading engine · Spanish / English
 
-![OpenCharts trading terminal](docs/screenshot.png)
+![OpenCharts trading terminal — market structure marked on SPY 15m (simulated data)](docs/screenshot.png)
 
 </div>
+
+> **Educational tool.** Orders are always simulated in your browser — the server is read-only and never sends
+> orders to a broker. Nothing here is investment advice. Read [docs/LIMITATIONS.md](docs/LIMITATIONS.md) before
+> practicing: it lists everything that is simulated or approximate.
 
 ---
 
 ## Table of contents
 
 - [What is OpenCharts?](#what-is-opencharts)
-- [Features](#features)
 - [Quick start](#quick-start)
-- [What's real and what's simulated](#whats-real-and-whats-simulated)
+- [Data providers](#data-providers)
+  - [Alpaca setup](#alpaca-setup)
+  - [IB Gateway setup](#ib-gateway-setup)
+- [Features](#features)
+- [Market structure and the guide](#market-structure-and-the-guide)
+- [Language](#language)
 - [How it works](#how-it-works)
-- [Built on Lightweight Charts](#built-on-lightweight-charts)
 - [Project structure](#project-structure)
-- [Building on OpenCharts](#building-on-opencharts)
-- [Refreshing the bundled market data](#refreshing-the-bundled-market-data)
-- [Bring your own data / backend](#bring-your-own-data--backend)
-- [Adding instruments](#adding-instruments)
 - [Configuration](#configuration)
 - [Scripts](#scripts)
+- [Building on OpenCharts](#building-on-opencharts)
+- [Built on Lightweight Charts](#built-on-lightweight-charts)
 - [Tech stack](#tech-stack)
 - [Known limitations](#known-limitations)
 - [Contributing](#contributing)
@@ -37,518 +42,352 @@ Advanced charting · full drawing-tool suite · 8 indicators · watchlist · dep
 
 ## What is OpenCharts?
 
-OpenCharts is a self-contained **trading terminal UI**. Open it and you land
-straight in the terminal: a candlestick chart with a TradingView-style drawing
-toolbar, indicators, a watchlist, a depth-of-market ladder and an order ticket —
-all wired to an **in-browser paper-trading engine** funded with $100,000.
+OpenCharts is a **trading terminal UI** — candlestick chart with a TradingView-style drawing toolbar, indicators,
+watchlist, depth-of-market ladder and order ticket — wired to an **in-browser paper-trading engine** funded with
+$100,000 and fed with **real market data** by a small local server:
 
-There is **no server to run**. The session is seeded with *genuine* historical
-OHLC pulled from Binance's public klines endpoint at build time, and a tick
-stream is replayed forward from the present, so the chart and prices move like a
-live feed while you place and manage paper trades.
+- **Alpaca** — US stocks/ETFs and crypto (a free paper account is enough for market data).
+- **Interactive Brokers** — stocks/ETFs, indices and forex through IB Gateway or TWS.
+- **Mock** — simulated data, no account needed.
 
-It's useful as:
+On top of the terminal it brings the tools of the `market-structure` learning project: automatic marking of
+**HH/HL/LH/LL, BOS and CHoCH**, optional **FVG, order blocks, EQH/EQL, sweeps, external structure, higher-timeframe
+levels, EMAs and daily VWAP**, a **contextual guide** (Spanish and English) that explains each mark with diagrams
+and step-by-step examples, and an optional **1D · 4H · 15m · 10m** view.
 
-- A **standalone charting / paper-trading app** you can host on any static host.
-- A **reference terminal UI** you can point at your own market-data and trading
-  backend — the data layer is isolated behind two modules
-  (see [Bring your own data](#bring-your-own-data--backend)).
-- A **learning sandbox** for charting, technical drawing and order management.
-
-The codebase was extracted from a closed-source prop-trading platform, so a few
-panels are gated off or stubbed rather than removed — those are called out
-explicitly below rather than advertised as features.
-
-**This is a community project.** The goal is a genuinely open trading terminal
-interface — beautiful charts, a deep drawing toolkit, and enough customizability
-that you can bend it into your own terminal instead of fighting it. It is
-deliberately small, dependency-light and backend-agnostic so that anyone can
-clone it, understand it in an afternoon and extend it. Contributions of every
-size are welcome, from a new indicator or drawing tool to an exchange adapter,
-a theme, a bug report or a docs fix — see
-[Building on OpenCharts](#building-on-opencharts) and
-[Contributing](#contributing).
-
-## Features
-
-### 📊 Charting
-- Candlestick chart powered by [`lightweight-charts`](https://github.com/tradingview/lightweight-charts) v4 with custom plugins.
-- Timeframes **1m → 1w** (1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w), up to 1000 bars per
-  timeframe (fewer where the exchange has less history, e.g. 461 weekly bars).
-- Volume histogram, OHLC legend, live bid/ask price lines, crosshair and bar countdown.
-- Toggleable chart plugins: crosshair highlight, session highlighting, session
-  breaks, bands indicator, OHLCV tooltip and delta (multi-touch) tooltip.
-- Chart settings dialog, right-click context menu, per-symbol preferences and
-  saveable **chart templates** — all persisted to `localStorage`.
-
-### 📐 Indicators
-SMA, EMA, RSI, MACD, Bollinger Bands, ATR, Stochastic and VWAP, added from the
-toolbar and removable individually or in bulk from the chart context menu.
-
-### ✏️ Drawing tools
-- Draggable, hideable tool rail grouped into **Lines** (trend line, ray, extended
-  line, horizontal, vertical, parallel channel), **Fibonacci** (retracement,
-  extension), **Shapes** (rectangle, ellipse, triangle, arrow), **Trade**
-  (long position, short position, measure) and **Text**.
-- Position tools show risk, R:R and position size against live account equity;
-  trend lines show Δprice / Δ% / bar count while being drawn or selected.
-- Per-object styling (color, width, line style, labels) with a TradingView-style
-  text editor, magnet mode (off / weak / strong snapping to OHLC), Shift for 45°
-  angle snapping and multi-select, and keyboard shortcuts (`Alt+H`, `Alt+T`,
-  `Alt+F`, `Alt+R`, `Alt+M`).
-- An **object tree** panel to select, toggle and delete drawings.
-- **Line-cross alerts**: enable an alert on a horizontal line or trend line and
-  the chart fires an in-session toast + sound when the mid price crosses it
-  (in-session only — nothing is persisted or delivered offline).
-- Drawings persist per symbol in `localStorage` and survive reloads.
-
-### 📋 Watchlist · DOM · order ticket
-- **Watchlist** with live prices across all bundled instruments.
-- **Depth-of-market ladder** around the live mid price.
-- **Order ticket**: market / limit / stop tickets with volume presets,
-  take-profit and stop-loss, one-click trade mode and an order confirmation
-  dialog. See [what's simulated](#whats-real-and-whats-simulated) for how
-  limit/stop tickets currently behave.
-- **Positions / Orders / Trade History** tabs with modify, close, partial close
-  and close-all, plus **Calendar** (TradingView embed) and **News** tabs.
-- Drag stop-loss / take-profit levels directly on the chart.
-- Trade execution sound (mutable), connection indicator, market-closed banner
-  and a dedicated mobile trading panel for narrow screens.
-
-### 💵 Built-in paper trading
-- $100,000 starting balance, 100× leverage, no commission or swap.
-- Orders fill against an in-browser engine at the latest replayed price.
-- Positions are **marked to market on every tick** with running P&L.
-- Stop-loss / take-profit are evaluated automatically and close positions when hit.
-- Account equity, balance, used and free margin update in real time.
-
-### 🛰️ Real market data, no backend
-- Bundled OHLC is **real** historical data fetched at build time — no random walks.
-- A replay feed streams those closes forward from "now" so the terminal feels live.
-- Everything runs client-side — deploy it as a static site.
+The terminal itself was extracted from a closed-source prop-trading platform, so a few inherited panels are gated
+off or stubbed; they are listed in [Known limitations](#known-limitations).
 
 ## Quick start
 
-> Requires **Node 20+**. OpenCharts now runs with a small local server
-> (`server/`) that streams **real market data** from **Alpaca** or
-> **Interactive Brokers** (or simulated data). Orders are always
-> **paper-traded in the browser** — the server is read-only and never sends
-> orders to a broker.
+> Requires **Node 20+**.
 
 ```bash
 npm install
 cp .env.example .env   # choose DATA_PROVIDER=alpaca|ibkr|mock and add your keys
 npm run dev            # server (127.0.0.1:3000) + web (http://localhost:5173)
-npm run dev:mock       # same, with simulated data — no broker account needed
-npm test
 ```
 
-| `DATA_PROVIDER` | Needs | Instruments |
-| --- | --- | --- |
-| `alpaca` (default) | Alpaca API keys (a free paper account is enough) | US stocks/ETFs, crypto |
-| `ibkr` | IB Gateway or TWS running, API enabled, *Read-Only API* on | Stocks/ETFs, indices (`^SPX`), forex (`EUR.USD`) |
-| `mock` | Nothing | Simulated stocks, forex and crypto |
+No broker account yet? `npm run dev:mock` runs everything with simulated data.
 
-Symbol names: `AAPL` (stock), `EUR.USD` (forex), `BTC/USD` (crypto), `^SPX`
-(index). Search any symbol from the chart's symbol picker to add it to your
-watchlist (saved per browser).
+Open <http://localhost:5173>. If the server is not running or the provider is not connected, the app says so and
+explains how to fix it.
 
-Production build: `npm run build && npm start` serves the terminal and the API
-from `http://127.0.0.1:3000`.
+Production build (one process serves the terminal and the API):
 
-Interface in **Spanish and English** (ES/EN switch in the chart toolbar; the
-default comes from `APP_LANG` in `.env`).
+```bash
+npm run build
+npm start              # http://127.0.0.1:3000
+```
 
-**Market structure for learning** (from the `market-structure` project): the
-*Structure* menu marks HH/HL/LH/LL, BOS and CHoCH on the chart (on by default)
-and adds optional FVG, order blocks, EQH/EQL, sweeps, external structure,
-higher-timeframe levels, EMA 10–200 and daily VWAP. Every item has a **?** that
-opens the bilingual **guide** (what it is, how to read it, the exact rule, what
-to practice, step-by-step examples). The *1 chart / 4 timeframes* switch opens
-a 1D · 4H · 15m · 10m view (layout 4 → 2 → 1 with the `L` key, Heikin Ashi).
+## Data providers
 
-**Read [docs/LIMITATIONS.md](docs/LIMITATIONS.md)** before practicing: it lists
-what is simulated or approximate (paper fills, sessions, provider caveats).
+The server talks to one provider, chosen with `DATA_PROVIDER` in `.env`. Every provider implements the same
+interface (`server/providers.js`), so the terminal works the same with any of them.
 
-> The sections below still describe the original static demo and will be
-> rewritten (see the integration plan): the bundled Binance replay feed has
-> been replaced by the server.
+| `DATA_PROVIDER` | What it needs | Instruments | Live prices |
+| --- | --- | --- | --- |
+| `alpaca` (default) | Alpaca API keys (paper or live) | US stocks/ETFs, crypto | Alpaca stream (IEX or SIP) |
+| `ibkr` | IB Gateway or TWS running and logged in | Stocks/ETFs, indices, forex | IB market data (delayed without a subscription) |
+| `mock` | Nothing | Simulated stocks, forex, crypto | Simulated |
 
-## What's real and what's simulated
+**Symbol names** used by the terminal: `AAPL` (stock/ETF), `EUR.USD` (forex), `BTC/USD` (crypto), `^SPX` (index).
+Search any symbol from the chart's symbol picker: results marked **+** are added to your watchlist (saved per
+browser). Remove one with the **×** on its watchlist row.
 
-OpenCharts is a paper terminal, and being precise about this matters more than
-marketing copy:
+All providers are **read-only**: they request history, symbol lists and quotes only.
 
-| Piece | Status |
+### Alpaca setup
+
+1. Create an account at [alpaca.markets](https://alpaca.markets) (a paper account is enough for market data).
+2. In the dashboard, open **API Keys** and generate a key pair. Paper and live accounts have separate keys.
+3. In `.env`: `DATA_PROVIDER=alpaca`, `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY`, and `ALPACA_PAPER=0` only if
+   they are live keys.
+4. `npm run dev`. The server console prints `[alpaca] keys OK`.
+
+Good to know:
+
+- **No forex and no indices** — Alpaca serves FX data to broker partners only. Use IBKR for `EUR.USD`, `^SPX`…
+- **Feed**: `ALPACA_FEED=iex` (default, free) covers one exchange, so volume is lower than the consolidated tape;
+  `sip` covers all US exchanges but free plans get it 15 minutes delayed.
+- With `USE_RTH=1` (default) stock candles are regular-hours only and hourly / 4-hour candles start at 9:30 and
+  13:30 New York (built from 30-minute bars), like IB's.
+
+### IB Gateway setup
+
+The server reads market data through the IB API, served by **IB Gateway** (or TWS). IBKR Desktop and Client Portal
+do **not** expose the socket API.
+
+1. **Install** IB Gateway *Stable* from
+   <https://www.interactivebrokers.com/en/trading/ibgateway-stable.php>.
+2. **Log in** choosing **IB API**, then **Paper Trading** (recommended — the paper account has its own username, see
+   Client Portal → *Settings* → *Paper Trading Account*) or Live.
+3. **API settings** — *Configure → Settings → API → Settings*:
+
+   | Setting | Value |
+   | --- | --- |
+   | Enable ActiveX and Socket Clients | ✅ |
+   | **Read-Only API** | ✅ keep it on: OpenCharts never sends orders |
+   | Socket port | `4001` live · `4002` paper (TWS: `7496` live · `7497` paper) |
+   | Allow connections from localhost only | ✅ |
+
+4. In `.env`: `DATA_PROVIDER=ibkr` and `IB_PORT` matching the socket port (`IB_HOST` defaults to `127.0.0.1`,
+   `IB_CLIENT_ID` to `17` — it must be unique among clients of the same Gateway).
+5. `npm run dev`. The server prints `[ib] ready to request data`.
+
+**One session per user**: IBKR allows a single active session per username — logging in to IB Gateway disconnects
+TWS / IBKR Desktop / mobile with the same user. Use the paper username or a secondary user for the API.
+
+| Symptom | What to check |
 | --- | --- |
-| OHLC history (6 crypto pairs × 8 timeframes) | **Real** Binance klines, bundled as JSON |
-| Tick feed | **Real** 1m closes, replayed on a 600 ms loop and looped when exhausted |
-| Bar timestamps | **Shifted** so the last real bar lands on the current period |
-| Bid/ask spread | **Derived** — synthesized around the replayed close |
-| DOM ladder sizes | **Synthetic** — random sizes around the real mid price |
-| Order fills, positions, P&L, margin | Real arithmetic against the in-browser engine |
-| Limit / stop orders | Accepted by the ticket but **fill immediately** — there is no resting-order book |
-| Order modify / cancel-all | **No-ops** in the demo engine |
-| News tab | **Placeholder headlines**, not a live feed |
-| Economic calendar tab & technical-analysis gauge | TradingView embed widgets — real data, loaded from TradingView's CDN |
-| Trade journal, trade calculator, AI trader, session replay | **Present in the code but not reachable** — journal and replay are flagged off pending QA, the AI trader is a stub, the calculator is never mounted |
-| Account state (balance, positions, orders) | In-memory — **resets on reload** |
-| Drawings, chart prefs, templates, sound mute | Persisted in `localStorage` |
+| "not connected" in the app | Gateway is open and logged in, the port matches `IB_PORT`, socket clients are enabled |
+| Connects and then drops | Another session with the same IBKR user took over |
+| "clientId already in use" | Set another `IB_CLIENT_ID` |
+| Market-data errors on a symbol | No data subscription: IB delivers delayed data (`IB_MARKET_DATA_TYPE=3`) or rejects some symbols |
+| Forex search finds nothing | IB's text search does not return pairs; the 14 IDEALPRO pairs in `server/forex.js` are offered (`EUR.USD`, `eurusd`, `gbp`…) |
+
+## Features
+
+### 📊 Charting
+- Candlestick chart on [Lightweight Charts](#built-on-lightweight-charts) v4 with custom plugins; timeframes
+  **1m → 1w**; older history loads as you scroll back.
+- Volume, OHLC legend, live bid/ask lines, crosshair, bar countdown; toggleable plugins (crosshair highlight,
+  session highlighting/breaks, bands, OHLCV and delta tooltips).
+- Chart settings, right-click menu, per-symbol drawings and saveable chart templates (all in `localStorage`).
+
+### 📐 Indicators
+SMA, EMA, RSI, MACD, Bollinger Bands, ATR, Stochastic and VWAP from the *Indicators* menu, plus the market-structure
+overlays described [below](#market-structure-and-the-guide).
+
+### ✏️ Drawing tools
+Lines, Fibonacci, shapes, long/short position tools with risk and R:R, text, measure; magnet mode, object tree,
+per-object styles and line-cross price alerts.
+
+### 📋 Watchlist · DOM · order ticket
+- Editable **watchlist** with live bid/ask, categories and favorites.
+- **Order ticket**: market / limit / stop with TP/SL, risk analysis, one-click mode and confirmation dialog.
+- Positions / orders / history tabs with modify, partial close and close-all; drag SL/TP on the chart.
+- Depth-of-market ladder (sizes are synthetic), calendar and analysis widgets (TradingView embeds).
+
+### 💵 Paper trading (never sent to a broker)
+- $100,000 starting balance; **market orders fill at the live ask (buy) / bid (sell)**.
+- Positions marked to market on every quote; SL/TP evaluated automatically.
+- Leverage per asset type: stocks 4×, forex 30×, crypto 2×. Margin is checked before filling.
+- In memory: a reload starts a new paper account.
+
+## Market structure and the guide
+
+The **Structure** button in the chart toolbar shows the current trend (▲ / ▼ and the last break) and opens the tools
+ported from `market-structure`:
+
+| Group | Item | What it marks |
+| --- | --- | --- |
+| Basic (on by default) | HH / HL / LH / LL | Each confirmed swing compared with the previous one of the same type |
+| | BOS / CHoCH | Break of the last unbroken swing with (BOS) or against (CHoCH) the trend |
+| | `n` and *Break* | Candles on each side to confirm a swing (per timeframe) · break by close or by wick |
+| Zones | FVG · Order Blocks | Unfilled 3-candle gaps · last opposite candle before a break of structure |
+| Liquidity | EQH / EQL · Sweeps | Nearly equal highs/lows (0.1×ATR) · wicks that take a swing and close back inside |
+| Structure | External (n×3) · Higher TF levels | Second, larger swing scale · active swings and last break of 1D / 4H / 15m |
+| Context | EMA 10–200 · VWAP (daily) · Volume | Exponential averages · volume-weighted average reset each day |
+
+Every item has a **?** button that opens the **guide**: what it is, how to read it on the chart, the exact rule the
+app applies, what to practice, its limits, mini-diagrams and step-by-step examples with scenarios ("if A happens →
+how to read it → what to check"). The switches inside the guide turn the overlays on and off without closing it.
+
+**4-timeframe view** — the *1 chart / 4 timeframes* switch shows **1D · 4H · 15m · 10m** side by side, as in
+`market-structure`: each panel has its own structure and `n`, higher-timeframe levels flow down to the lower panels,
+the crosshair is synced, the layout cycles **4 → 2 → 1** with the `L` key (click a timeframe to choose it,
+double-click to maximize) and **Heikin Ashi** candles can be enabled from the Structure menu. Paper orders keep
+going through the order panel on the right.
+
+The detection code is pure and tested (`src/lib/structure/`): the original `market-structure` test suite runs
+against it unchanged.
+
+## Language
+
+The whole interface and the guide are available in **Spanish and English**. The default comes from `APP_LANG`
+(`es` or `en`) in `.env`; each browser can switch with the **ES / EN** buttons in the chart toolbar (saved in
+`localStorage`, no reload needed). Texts live in `src/i18n/en.ts` and `src/i18n/es.ts`; both must define the same
+keys (checked by TypeScript and by `src/i18n/i18n.test.ts`). The guide content is in `src/lib/guide/`.
 
 ## How it works
 
-The UI is **backend-agnostic**. It talks to two service modules — a REST-shaped
-`api` and a streaming `wsClient` — and never cares where the data comes from. In
-this repo both are implemented by a small in-browser **demo layer**:
-
 ```
-                ┌─────────────────────────────────────────────┐
-                │                Terminal UI                    │
-                │  ChartPanel · OrderPanel · DOM · Watchlist     │
-                └───────────────┬───────────────┬──────────────┘
-                                │ api.*          │ wsClient.subscribe()
-                ┌───────────────▼───────┐ ┌──────▼───────────────┐
-                │   services/api.ts      │ │   services/ws.ts      │
-                │  (REST-shaped facade)  │ │  (streaming client)   │
-                └───────────────┬───────┘ └──────┬───────────────┘
-                                │                 │
-                ┌───────────────▼─────────────────▼───────────────┐
-                │                services/demo/                    │
-                │  api.ts      demo method table (+ benign fallback)│
-                │  engine.ts   paper trading (positions, P&L, SL/TP)│
-                │  feed.ts     replays real ticks → bus → store     │
-                │  candles.ts  serves bundled OHLC (shifted to now) │
-                │  bus.ts      in-process pub/sub                   │
-                │  instruments.ts / data/  real OHLC + symbol specs │
-                └──────────────────────────────────────────────────┘
+ Browser                                              Local server (server/, Node + Express)
+┌───────────────────────────────────────────┐        ┌──────────────────────────────────────────┐
+│ Terminal UI (React)                         │  HTTP  │ /api/status   provider status, defaults     │
+│  ChartPanel · OrderPanel · Watchlist · DOM  │◄──────►│ /api/symbols  watchlist specs               │
+│  Structure menu · Guide · 4-TF view         │  /api  │ /api/search   symbol search                 │
+│                                             │        │ /api/candles  history (cached, paced)       │
+│ services/server  ── market data client      │   WS   │ /ws           live quotes, per-symbol       │
+│ services/ws.ts   ── quotes → bus + engine   │◄──────►│               subscriptions, throttled      │
+│ services/paper   ── paper engine, bus       │  /ws   │                                             │
+│   (positions, orders, P&L — never sent)     │        │ providers: alpaca.js · ib.js · mock.js       │
+└───────────────────────────────────────────┘        └───────────────┬──────────────────────────┘
+                                                                         │ read-only
+                                                     Alpaca REST + stream │ IB Gateway / TWS socket API
 ```
 
-- **`services/demo/engine.ts`** — the paper-trading engine and single source of
-  truth for the account, positions and orders. It marks positions to market and
-  publishes the same position / order / equity events the UI already consumed.
-- **`services/demo/feed.ts`** — replays the bundled 1-minute closes for every
-  symbol as a forward-moving tick stream, every 600 ms, and drives
-  `engine.mark()`.
-- **`services/demo/candles.ts`** — serves the bundled history, time-shifted so
-  the most recent bar aligns to "now" (OHLC values stay real; only the timeline
-  is normalized).
-- **`services/api.ts`** — wraps the demo method table in a `Proxy` whose fallback
-  resolves any unimplemented method to `null`, so leftover calls from the
-  platform this was extracted from never throw.
-- **`services/ws.ts`** — exposes the same `connect` / `subscribe` /
-  `subscribeAccounts` / `onStateChange` surface as the original reconnecting
-  WebSocket client, backed by the in-process bus.
+- **`server/`** — `providers.js` picks the provider; each one implements `searchSymbols`, `resolve`, `getBars` and
+  `subscribeQuotes`. `stream.js` shares one provider subscription per symbol between all browser tabs and throttles
+  ticks. Responses are cached; IB historical requests are queued to respect IB's pacing limits.
+- **`src/services/api.ts`** — the REST-shaped facade the UI calls. Market-data methods go to the server
+  (`services/server/market.ts`); trading methods go to the paper engine (`services/paper/`). Unknown methods inherited
+  from the original platform resolve to `null`.
+- **`src/services/ws.ts`** — WebSocket client with reconnection. Each quote is published on the in-process bus
+  (`market-data` channel, consumed by `MarketDataBridge`) and marks the paper engine's positions to market.
+- **Live candles** are built from quotes, anchored to the last history bar so they follow session-based bars
+  (stocks open at 9:30 New York).
 
-Because the data layer sits behind a stable interface, **no UI component had to
-change** to run without a server.
+## Project structure
+
+```
+server/                     # read-only market-data server
+├─ index.js                 # Express API + static dist/ in production
+├─ stream.js                # /ws live quotes hub
+├─ providers.js             # alpaca | ibkr | mock
+├─ alpaca.js · ib.js · mock.js · forex.js
+├─ symbols.js               # app symbol names ⇄ provider descriptors, sessions, specs
+├─ timeframes.js · cache.js · config.js (.env)
+└─ __tests__/
+src/
+├─ App.tsx                  # boot: server status, language, paper session, watchlist
+├─ i18n/                    # es.ts / en.ts dictionaries, useT(), ES/EN switch
+├─ pages/TradingPage.tsx    # terminal layout
+├─ pages/trading/           # chart, toolbars, order panel, DOM, watchlist, drawing rail…
+├─ components/structure/    # Structure menu, guide panel, 4-TF view, chart overlay hook
+├─ lib/structure/           # structure + indicators (pure, tested), drawing primitive, settings store
+├─ lib/guide/               # guide content (es/en), examples, SVG diagrams
+├─ lib/chart-plugins/       # Lightweight Charts plugins and the drawing engine
+├─ services/
+│  ├─ server/               # HTTP client for /api, watchlist storage
+│  ├─ paper/                # paper engine, event bus, symbol registry, api table
+│  ├─ api.ts · ws.ts · queries.ts · store.tsx · schemas.ts
+└─ hooks/ · components/ · styles/
+docs/LIMITATIONS.md         # what is simulated or approximate
+```
+
+## Configuration
+
+Server settings go in `.env` (see [.env.example](.env.example)); shell variables win over `.env`.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `DATA_PROVIDER` | `alpaca` | `alpaca`, `ibkr` or `mock` (`MOCK=1` also forces mock) |
+| `APP_LANG` | `es` | Default interface language (`es` or `en`) |
+| `WATCHLIST` | per provider | Comma-separated watchlist for a new browser (`SPY,AAPL,BTC/USD`) |
+| `USE_RTH` | `1` | `1` = regular trading hours only for stocks/indices, `0` = include pre/post market |
+| `ALPACA_API_KEY_ID` / `ALPACA_API_SECRET_KEY` | empty | Alpaca keys |
+| `ALPACA_PAPER` | `1` | `1` = paper keys, `0` = live keys |
+| `ALPACA_FEED` | `iex` | `iex` or `sip` |
+| `IB_HOST` / `IB_PORT` / `IB_CLIENT_ID` | `127.0.0.1` / `4001` / `17` | IB Gateway / TWS connection |
+| `IB_MARKET_DATA_TYPE` | `3` | `1` live (needs a subscription), `3` delayed |
+| `PORT` / `HOST` | `3000` / `127.0.0.1` | Local server; keep it on localhost |
+
+Front-end (optional): `VITE_POSTHOG_API_KEY` / `VITE_POSTHOG_HOST` enable PostHog analytics — unset (the default)
+means analytics are never initialized. The calendar and technical-analysis widgets load TradingView embed scripts
+(third-party requests).
+
+## Scripts
+
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Server + web together (Vite proxies `/api` and `/ws` to the server) |
+| `npm run dev:mock` | Same with simulated data |
+| `npm run server` / `npm run server:mock` | Server only (restarts on changes in `server/`) |
+| `npm run web` | Web only |
+| `npm run build` | Production build to `dist/` |
+| `npm start` | Server serving the API and `dist/` on `127.0.0.1:3000` |
+| `npm test` / `npm run test:watch` | Vitest (front-end, server, structure and i18n tests) |
+| `npm run typecheck` | `tsc` (see limitations: inherited code still has errors) |
+
+## Building on OpenCharts
+
+`npm test` is the gate; TypeScript runs in `strict` mode with `noUncheckedIndexedAccess`, and `@/` resolves to `src/`.
+
+- **Add a data provider** — implement the interface documented at the top of `server/providers.js` and register it
+  in `FACTORIES`. Use `server/mock.js` as the smallest example; keep it read-only.
+- **Add a market-structure overlay** — pure detection in `src/lib/structure/indicators.ts` (with a test), selection in
+  `computeOverlay()` (`compute.ts`), drawing in `primitive.ts`, a key in `IND_KEYS` (`store.ts`), a row in
+  `StructureMenu.tsx` and a guide entry in `src/lib/guide/help.es.ts` / `help.en.ts`.
+- **Add an indicator** — calculation in `src/lib/indicators.ts`, entry in `INDICATOR_REGISTRY`, series in
+  `pages/trading/useIndicators.ts`, label key `ind.<TYPE>` in the dictionaries.
+- **Add a drawing tool** — `pages/trading/constants.ts` (type), `drawing-tools/manager.ts`, `renderers.ts`,
+  `hit-test.ts`, `DrawingToolRail.tsx`, and a `tool.<name>` label key.
+- **Add UI text** — add the key to both `src/i18n/en.ts` and `src/i18n/es.ts` and read it with `useT()`.
+
+Where state lives: zustand (`services/store.tsx` trading state, `lib/structure/store.ts` structure settings,
+`i18n` language), TanStack Query (everything fetched), the in-process bus (`market-data`, `positions`, `orders`,
+`account`) and `localStorage` (watchlist `oc_watchlist`, selected symbol, drawings `oc_drawings_<SYMBOL>`, chart
+templates and preferences, structure settings `oc_structure`, language `oc_lang`).
+
+Gotchas: `api` resolves unknown methods to `null` (a typo fails silently); React runs in `StrictMode`, so chart
+effects mount twice in development and need clean-ups; the paper engine is in memory.
 
 ## Built on Lightweight Charts
 
 OpenCharts is **built on top of TradingView's
-[Lightweight Charts™](https://github.com/tradingview/lightweight-charts)**
-(`lightweight-charts` `^4.2.0`, resolved to 4.2.3 in the lockfile, which in turn
-pulls in `fancy-canvas`, MIT). The chart canvas, series, panes, price scales,
-crosshair and time axis are all
-Lightweight Charts. OpenCharts is the terminal *around* it: the drawing engine
-(`src/lib/chart-plugins/drawing-tools/`), the indicator layer, the series
-primitives, and the panels, order flow and paper engine that surround the chart.
-
-Several plugins under `src/lib/chart-plugins/` (`plugin-base.ts`, `tooltip/`,
-`delta-tooltip/`, `session-highlighting/`, `session-breaks/`,
-`bands-indicator/`, `highlight-bar-crosshair/`, `helpers/`) are adapted from the
-`plugin-examples` shipped in the Lightweight Charts repository, and carry that
-project's license.
+[Lightweight Charts™](https://github.com/tradingview/lightweight-charts)** (`lightweight-charts` `^4.2.0`, which pulls
+in `fancy-canvas`, MIT). The chart canvas, series, panes, price scales, crosshair and time axis are Lightweight
+Charts; OpenCharts is the terminal around it. Several plugins under `src/lib/chart-plugins/` are adapted from the
+`plugin-examples` of the Lightweight Charts repository and carry that project's license.
 
 ### Licensing — read this before you fork or deploy
 
-- **Lightweight Charts is open source under the
-  [Apache License 2.0](https://github.com/tradingview/lightweight-charts/blob/master/LICENSE)** —
-  free for commercial use, but Apache 2.0 comes with conditions.
-- **Attribution is required.** TradingView's terms state that you must add the
-  attribution notice from their `NOTICE` file and a link to
-  <https://www.tradingview.com/> on the page of your site or app that users see.
-  The notice reads:
+- Lightweight Charts is licensed under the
+  [Apache License 2.0](https://github.com/tradingview/lightweight-charts/blob/master/LICENSE).
+- **Attribution is required**: the notice from TradingView's `NOTICE` file and a link to
+  <https://www.tradingview.com/> must be visible to users:
 
   ```
   TradingView Lightweight Charts™
   Copyright (с) 2025 TradingView, Inc. https://www.tradingview.com/
   ```
 
-- **OpenCharts satisfies this via the chart's built-in attribution logo.** The
-  `attributionLogo` layout option defaults to `true` and this project never
-  overrides it, so the TradingView link renders on the chart pane. **Do not set
-  `attributionLogo: false` unless you place the notice and link somewhere else
-  users can see.** The option is set (or, here, left alone) where the chart is
-  created in [`src/pages/trading/ChartPanel.tsx`](src/pages/trading/ChartPanel.tsx).
-- **Keep the notice when you redistribute.** Apache 2.0 requires that you pass
-  along the license and notice with any copy or derivative — that includes the
-  adapted plugin code in `src/lib/chart-plugins/`.
-- **OpenCharts' own code is MIT** (see [LICENSE](LICENSE)). MIT and Apache 2.0
-  are compatible, so a build that combines them is fine — you just have to honor
-  Apache 2.0's attribution and notice terms for the chart portion.
+- OpenCharts satisfies this with the chart's built-in attribution logo (`attributionLogo`, default `true`, never
+  overridden — including in the 4-timeframe view). Do not disable it unless you show the notice and link elsewhere.
+- Keep the license and notice when you redistribute, including the adapted plugin code.
+- OpenCharts' own code is MIT ([LICENSE](LICENSE)); MIT and Apache 2.0 are compatible.
 
-None of this is legal advice; if you are shipping commercially, read the license
-yourself.
-
-## Project structure
-
-```
-src/
-├─ App.tsx                  # boots the demo session, renders the terminal
-├─ main.tsx                 # React entry, providers, MarketDataBridge, chunk-reload guard
-├─ pages/
-│  ├─ TradingPage.tsx       # the full terminal layout (~700 lines)
-│  ├─ AiTraderPage.tsx      # stub — the AI trader is gated off
-│  └─ trading/              # chart, toolbars, order panel, DOM, watchlist,
-│                           #   drawing rail, object tree, replay HUD/scrubber,
-│                           #   news overlay, indicators, challenge levels
-├─ lib/
-│  ├─ chart-plugins/        # lightweight-charts plugins used by the chart
-│  │  ├─ drawing-tools/      #   manager, renderers, hit-testing, geometry, alerts
-│  │  ├─ delta-tooltip/ tooltip/ highlight-bar-crosshair/
-│  │  └─ session-breaks/ session-highlighting/ bands-indicator/
-│  ├─ indicators.ts         # SMA/EMA/RSI/MACD/BOLL/ATR/STOCH/VWAP
-│  ├─ livePnl.ts            # live P&L / price math shared by the tables
-│  ├─ posthog.ts            # optional analytics (no-op without an API key)
-│  └─ utils.ts
-├─ components/              # dialogs, mobile panel, TradingView embeds, ui primitives
-├─ hooks/                   # drawings, chart prefs, trader prefs, trade sound…
-├─ services/
-│  ├─ api.ts                # REST-shaped facade (demo-backed)
-│  ├─ ws.ts                 # streaming client (demo-backed)
-│  ├─ api/                  # legacy HTTP clients from the original platform;
-│  │                        #   chart-templates.ts is localStorage-backed and live
-│  ├─ queries.ts            # TanStack Query hooks
-│  ├─ store.tsx             # zustand stores (auth + trading state)
-│  ├─ schemas.ts            # zod schemas / shared types
-│  └─ demo/                 # engine, feed, candles, bus, instruments, bundled data
-├─ __tests__/               # Vitest unit tests
-└─ styles/
-scripts/
-└─ fetch-demo-data.mjs      # refresh the bundled real OHLC
-```
-
-## Building on OpenCharts
-
-Everything below is a real extension point in the code, not a roadmap. `npm run
-typecheck` and `npm run test` are the two gates; TypeScript runs in `strict` mode
-with `noUncheckedIndexedAccess` and `noUnusedLocals`, and `@/` resolves to
-`src/`.
-
-### Add an indicator
-
-1. Write the pure calculation in [`src/lib/indicators.ts`](src/lib/indicators.ts)
-   (they take candles and return `{ time, value }[]` — copy `sma` or `rsi`).
-2. Add the type to the `IndicatorType` union and an entry to
-   `INDICATOR_REGISTRY` (`label`, `pane: "overlay" | "below"`, `defaultParams`,
-   `color`). The toolbar menu renders straight from the registry.
-3. Render it in [`src/pages/trading/useIndicators.ts`](src/pages/trading/useIndicators.ts),
-   which creates and disposes the Lightweight Charts series per active indicator.
-
-### Add a drawing tool
-
-The drawing engine is custom and lives in
-[`src/lib/chart-plugins/drawing-tools/`](src/lib/chart-plugins/drawing-tools/).
-A new tool touches five places:
-
-| File | What you add |
-| --- | --- |
-| `pages/trading/constants.ts` | the tool name in the `DrawingTool` union and any new fields on `DrawingLine` |
-| `drawing-tools/manager.ts` | a branch in `buildNew()` that turns anchor points into a `DrawingLine`, plus the single-click list in the pointer handler if it is a one-click tool |
-| `drawing-tools/renderers.ts` | a `case` in the render switch that paints it |
-| `drawing-tools/hit-test.ts` | a `case` so it can be selected and dragged |
-| `pages/trading/DrawingToolRail.tsx` | the rail button, icon and group |
-
-`geometry.ts` holds the shared math, `types.ts` the resolved (pixel-space)
-shapes. Drawings are plain JSON, so anything you add persists automatically.
-
-### Add a chart plugin
-
-Extend `PluginBase` from
-[`src/lib/chart-plugins/plugin-base.ts`](src/lib/chart-plugins/plugin-base.ts)
-(the Lightweight Charts `ISeriesPrimitive` contract: pane views + renderers),
-attach it where the other primitives are attached in `ChartPanel.tsx`, then add
-it to the plugin list in `ChartToolbar.tsx` so it gets a toggle. The existing
-six plugins are the reference implementations.
-
-### Where state lives
-
-- **Zustand** (`services/store.tsx`) — auth and trading state (symbols, accounts,
-  selected symbol, live ticks).
-- **TanStack Query** (`services/queries.ts`) — everything fetched through `api`,
-  keyed by `queryKeys`.
-- **The demo bus** (`services/demo/bus.ts`) — `market-data`, `positions`,
-  `orders` and `account` events; `components/MarketDataBridge.tsx` is the single
-  place they land in React.
-- **`localStorage`** — drawings (`oc_drawings_<SYMBOL>`), chart templates
-  (`oc_chart_templates`), chart and trader preferences (`trader_prefs`, scoped
-  per user id) and the sound mute flag (`tradeSoundMuted`). Chart preference
-  changes broadcast a `chart-preferences-updated` window event rather than
-  going through a store.
-
-### Gotchas worth knowing
-
-- **`api` swallows unknown methods.** [`services/api.ts`](src/services/api.ts)
-  wraps the demo table in a `Proxy` that resolves *any* unimplemented method to
-  `null`. A typo'd method name fails silently instead of throwing — check
-  `services/demo/api.ts` when a call mysteriously returns nothing.
-- **Flags gate whole panels.** `REPLAY_ENABLED` in `pages/trading/constants.ts`
-  hides the replay HUD and scrubber; the journal tab is commented out in
-  `BottomPanel.tsx`; the AI trader is a `null`-returning stub.
-- **React runs in `StrictMode`**, so chart effects mount twice in development —
-  every series, primitive and subscription needs a working cleanup path.
-- **The demo engine is in-memory.** Anything you want to survive a reload has to
-  be written to `localStorage` (or a backend you wire up yourself).
-
-## Refreshing the bundled market data
-
-The demo OHLC lives in `src/services/demo/data/` as JSON, fetched from the public
-**Binance klines** endpoint (no API key required):
-
-```bash
-node scripts/fetch-demo-data.mjs
-```
-
-This re-pulls up to 1000 bars per symbol per timeframe and rewrites the bundled files
-plus `data/manifest.json`. The candles are genuine market history — OpenCharts
-never ships synthetic OHLC.
-
-## Bring your own data / backend
-
-To connect OpenCharts to real (or your own simulated) data, implement two files
-against your APIs — the rest of the app is untouched:
-
-1. **`src/services/api.ts`** — the request/response methods the UI calls
-   (`getSymbols`, `getCandles`, `placeOrder`, `getPositions`, `closePosition`, …).
-   `src/services/demo/api.ts` is the complete list of what the terminal actually
-   reaches for; the expected shapes are in `src/services/schemas.ts`.
-2. **`src/services/ws.ts`** — a client exposing
-   `connect` / `subscribe(channel, handler)` / `subscribeAccounts` / `onStateChange`.
-   Publish `MarketTick`, `CandleUpdate`, `Position*`, `Order*` and `EquityUpdated`
-   events on the `market-data` / `positions` / `orders` / `account` channels.
-
-`src/components/MarketDataBridge.tsx` shows exactly which events the UI consumes.
-
-Two leftovers from the original platform help if you go this route:
-`src/services/api/request.ts` is a working HTTP client with token refresh, and
-the Vite dev server already proxies `/api` and `/ws` to `http://localhost:3000`.
-
-## Adding instruments
-
-Demo instruments are defined in `src/services/demo/instruments.ts` (currently
-BTCUSD, ETHUSD, SOLUSD, BNBUSD, XRPUSD and ADAUSD). To add one:
-
-1. Add a `Symbol` entry (name, tick size, contract size, etc.).
-2. Add its trading pair to the `SYMBOLS` map in `scripts/fetch-demo-data.mjs`.
-3. Run `node scripts/fetch-demo-data.mjs` to fetch and bundle its history.
-
-## Configuration
-
-Everything works with no configuration. Optional environment variables:
-
-| Variable | Effect |
-| --- | --- |
-| `VITE_POSTHOG_API_KEY` | Enables PostHog analytics. **Unset (the default) means analytics are never initialized and nothing leaves the browser.** |
-| `VITE_POSTHOG_HOST` | PostHog host, defaults to `https://us.i.posthog.com` |
-| `VITE_API_URL` | Base URL used by the legacy HTTP client in `src/services/api/` |
-
-Note that the Calendar tab and the technical-analysis gauge load TradingView's
-embed scripts from TradingView's CDN — they need no key, but they are third-party
-network requests. Drop those components if you want a strictly offline build.
-
-## Scripts
-
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Start the Vite dev server |
-| `npm run dev:ci` | Dev server bound to `0.0.0.0:5173` |
-| `npm run build` | Production build to `dist/` |
-| `npm run preview` | Preview the production build |
-| `npm run typecheck` | Type-check the project with `tsc` |
-| `npm run test` | Run the Vitest unit tests |
-| `npm run test:watch` | Run tests in watch mode |
-| `npm run lint` | Runs `eslint src/` — ESLint is **not** currently a declared dependency, so install it first |
-| `node scripts/fetch-demo-data.mjs` | Refresh bundled real OHLC |
+None of this is legal advice.
 
 ## Tech stack
 
-- **React 19** + **TypeScript 5.7** + **Vite 6**
-- **lightweight-charts 4** (+ custom plugins) for the chart
-- **Zustand** for state, **TanStack Query** for caching
-- **Tailwind CSS 3** + **Radix UI** primitives + **lucide-react** icons
-- **Zod** in `services/schemas.ts` as the shared type source (types are inferred
-  from the schemas; nothing is parsed at runtime)
-- **Vitest** + **Testing Library** for tests
-- Optional **posthog-js** analytics, off unless a key is set
-
-`package.json` also declares `framer-motion`, `html-to-image`,
-`@tanstack/react-virtual` and `react-router-dom`; the first three are unused and
-React Router only supplies a `BrowserRouter` wrapper — there are no routes.
+- **React 19** + **TypeScript 5.7** + **Vite 6**; **lightweight-charts 4** with custom plugins
+- **Zustand** and **TanStack Query**; **Tailwind CSS 3** + **Radix UI** + **lucide-react**
+- Server: **Node** + **Express 5**, **ws**, **dotenv**, **@stoqey/ib** (IB API)
+- **Vitest** + **Testing Library**
 
 ## Known limitations
 
-- **No resting orders.** The demo engine fills every ticket immediately; limit
-  and stop prices are accepted but not worked. `modifyOrder` and
-  `cancelAllOrders` are no-ops.
-- **Account state is ephemeral** — positions, orders and balance reset on reload.
-  Drawings, chart preferences and templates persist via `localStorage`.
-- **Timeline is normalized** — bundled history is shifted so the latest bar is
-  "now", and the tick replay loops when it reaches the end of the 1m series.
-  OHLC values are real; the timestamps are remapped to feel live.
-- **The DOM ladder is synthetic** — real mid price, random sizes. There is no
-  order book in the bundled data.
-- **Crypto-only demo symbols** out of the box (the data source is Binance). Wire
-  your own adapter for FX, futures or equities.
-- **Dormant code from the original platform** ships in the repo: session replay
-  (`REPLAY_ENABLED = false`), the trade journal (hidden pending QA), the trade
-  calculator (never mounted), the AI trader (stubbed), challenge/risk-rule price
-  levels (inert because the demo account reports no risk limits), unused
-  marketing assets under `public/`, and four dependencies nothing imports.
-- **Thin test coverage** — the Vitest suite covers `lib/utils` and the button
-  component only. Playwright is a declared dev dependency but no end-to-end
-  specs are checked in.
-- The production `build` runs Vite only; run `npm run typecheck` separately for
-  full type checking.
+The complete, maintained list is in **[docs/LIMITATIONS.md](docs/LIMITATIONS.md)** (providers, sessions, paper
+engine, market-structure tools, interface and repository status). The main ones:
+
+- Paper only: limit/stop tickets fill immediately; no slippage, commissions or swap; the account resets on reload.
+- Alpaca has no forex or indices; IBKR without a data subscription is delayed; Alpaca and IBKR were only tested
+  against fake APIs while building them.
+- Stock ticks outside regular hours are dropped with `USE_RTH=1`; the chart time axis is UTC.
+- The DOM sizes and the news tab are placeholders.
+- Inherited, unreachable panels: session replay, trade journal, AI trader, trade calculator, prop-firm challenge
+  levels.
 
 ## Contributing
 
-OpenCharts is a community project and it is open to anyone who wants to make it
-better — there is no core team you need permission from. Issues, pull requests,
-questions and design opinions are all welcome, and small first contributions are
-genuinely useful.
-
-Good places to start:
-
-- **Indicators and drawing tools** — the two most self-contained additions; see
-  [Building on OpenCharts](#building-on-opencharts).
-- **A real resting-order book** in the demo engine, so limit and stop orders
-  actually work.
-- **Persistence for the paper account**, so a session survives a reload.
-- **Data adapters** for other exchanges or brokers, behind the existing
-  `api` / `wsClient` interfaces.
-- **Themes and layout customization** — the chart palette lives in
-  `pages/trading/constants.ts` and the design tokens in `tailwind.config.js`.
-- **Finishing or removing the dormant panels** listed under
-  [Known limitations](#known-limitations).
-- **Tests, docs and bug reports** — coverage is thin and every report helps.
-
-Before opening a PR, run `npm run typecheck` and `npm run test`, and keep changes
-to the demo layer behind the `api` / `wsClient` interfaces so the terminal stays
-backend-agnostic.
+Issues and pull requests are welcome. Good places to start: a resting-order book for the paper engine, persistence
+of the paper account, more data providers, more structure overlays (with a guide entry in both languages), tests,
+and finishing or removing the dormant panels. Run `npm test` before opening a PR and keep broker integrations
+read-only.
 
 ## Acknowledgements
 
-OpenCharts stands on TradingView's open-source
-[Lightweight Charts™](https://github.com/tradingview/lightweight-charts), which
-renders every chart here, and on the plugin examples shipped in that repository.
-Thank you to TradingView for releasing it under a permissive license.
+- TradingView's open-source [Lightweight Charts™](https://github.com/tradingview/lightweight-charts) and its plugin
+  examples render every chart here.
+- The original **OpenCharts** terminal (`dylanpersonguy/OpenCharts`), on which this learning version is built.
+- The **market-structure** project, source of the provider strategy, the structure detection, its tests and the
+  contextual guide.
 
 ## License
 
-OpenCharts is released under the **MIT License** — see [LICENSE](LICENSE).
-
-It bundles TradingView's Lightweight Charts™, which is licensed under the
-**Apache License 2.0** and requires that you keep its attribution notice and a
-link to <https://www.tradingview.com/> visible to your users. See
-[Built on Lightweight Charts](#built-on-lightweight-charts) for what that means
-in practice before you deploy or redistribute a fork.
+OpenCharts is released under the **MIT License** — see [LICENSE](LICENSE). It bundles TradingView's Lightweight
+Charts™ (Apache License 2.0), whose attribution notice and link must stay visible to your users; see
+[Built on Lightweight Charts](#built-on-lightweight-charts).

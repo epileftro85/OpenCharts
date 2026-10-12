@@ -7,7 +7,7 @@ lists what is known to be incomplete or approximate, so nothing here surprises
 you while practicing.
 
 _Last updated: 2026-10-12. Covers: data providers (phase 1–2), ES/EN interface (phase 3), market
-structure tools, contextual guide and 4-timeframe view (phase 4)._
+structure tools, contextual guide and 4-timeframe view (phase 4), documentation (phase 5)._
 
 ## Data providers
 
@@ -69,6 +69,5 @@ structure, higher-TF levels, EMA 10–200, daily VWAP, volume, Heikin Ashi) toge
 
 - The original bundled Binance data (`src/services/paper/data/`, `candles.ts`, `feed.ts`, `scripts/fetch-demo-data.mjs`) is no longer used and should be deleted; `feed.ts` causes 3 TypeScript errors until it is.
 - `npm run typecheck` already reported ~150 errors in code inherited from the original platform (queries, replay, journal, preferences); `vite build` and the tests are unaffected.
-- README sections after "Quick start" still describe the original static demo.
 - Settings of the structure tools, watchlist, language and chart preferences are per browser (`localStorage`); there is no account or sync.
 - Tests from `market-structure` for structure/indicators were ported verbatim (`src/lib/structure/*.test.ts`, type-checking disabled in those two files).
