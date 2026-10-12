@@ -243,6 +243,7 @@ function TfPanel({
     const last = real[real.length - 1];
     if (!tick || !series || !last) return;
     const mid = (tick.bid + tick.ask) / 2;
+    if (!(mid > 0)) return;
     const tSec = Math.floor(tick.timestamp / 1000);
     if (tSec < last.time) return;
     const step = TF_SEC[tf];

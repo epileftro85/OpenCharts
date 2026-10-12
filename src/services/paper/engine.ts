@@ -36,7 +36,7 @@ const positions: Position[] = [];
 const orders: Order[] = [];
 const closed: ClosedPosition[] = [];
 const fills: Fill[] = [];
-const quotes = new Map<string, { bid: number; ask: number }>();
+const quotes = new Map<string, { bid: number; ask: number; at: number }>();
 
 export function getAccount(): Account {
   return { ...account };
@@ -56,6 +56,11 @@ export function getClosedPositions(): ClosedPosition[] {
 export function getFills(): Fill[] {
   return fills.map((f) => ({ ...f }));
 }
+/** Latest real quote received for `symbol`, or null before the first tick. */
+export function getQuote(symbol: string): { bid: number; ask: number; at: number } | null {
+  return quotes.get(symbol) ?? null;
+}
+
 /** Latest mid price (0 until the first tick arrives). */
 export function getLastPrice(symbol: string): number {
   const q = quotes.get(symbol);
@@ -281,7 +286,8 @@ function checkStops(pos: Position, price: number): boolean {
 
 /** Called by the market-data client on every live quote: marks positions, fires SL/TP. */
 export function mark(symbol: string, bid: number, ask: number): void {
-  quotes.set(symbol, { bid, ask });
+  if (!(bid > 0 && ask > 0)) return; // never let an empty quote reach positions or the chart
+  quotes.set(symbol, { bid, ask, at: Date.now() });
   const affected = positions.filter((p) => p.symbolName === symbol);
   if (affected.length === 0) return;
   for (const pos of affected) {

@@ -413,6 +413,7 @@ export const useTradingStore = create<TradingState>((set, get) => ({
   },
 
   updateTick: (symbolName, bid, ask, timestamp) => {
+    if (!(bid > 0 && ask > 0)) return; // empty quote (no price yet): ignore
     // 1. Check pending buffer (same-frame dedup with timestamp awareness)
     const pending = _pendingTicks.get(symbolName);
     if (pending && pending.bid === bid && pending.ask === ask && pending.timestamp >= timestamp)
@@ -454,6 +455,7 @@ export const useTradingStore = create<TradingState>((set, get) => ({
   },
 
   updateLiveTick: (symbolName, bid, ask, timestamp) => {
+    if (!(bid > 0 && ask > 0)) return;
     const pending = _pendingLiveTicks.get(symbolName);
     if (pending && pending.bid === bid && pending.ask === ask && pending.timestamp >= timestamp)
       return;

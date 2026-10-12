@@ -466,6 +466,9 @@ function applyTick(tick: TickData, ctx: RtCtx): void {
   const prev = ctx.lastCandle.current;
   if (!prev) return;
   const mid = (tick.bid + tick.ask) / 2;
+  if (!(mid > 0)) return;
+  // A quote older than the last bar (e.g. a snapshot from before a symbol/view switch) must not edit it.
+  if (tickMs < (prev.time as number) * 1000) return;
   const bucketTime = getAnchoredBucketTime(prev.time as number, tickMs, ctx.timeframe) as Time;
   const isContinuation = prev.time === bucketTime;
   const bar = buildTickBar(prev, isContinuation, bucketTime, mid, ctx);

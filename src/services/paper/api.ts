@@ -129,9 +129,11 @@ export const paperApi = {
   searchSymbols: market.searchSymbols,
   getCandles: market.getCandles,
   getCandlesWithMeta: market.getCandlesWithMeta,
+  // Snapshot used to prime bid/ask on symbol switch: only a quote that really arrived from the
+  // feed (null otherwise — a 0 price would paint a candle down to zero and squash the chart).
   getTick: (symbol: string) => {
-    const price = engine.getLastPrice(symbol);
-    return Promise.resolve({ symbol, bid: price, ask: price, timestamp: Date.now() });
+    const q = engine.getQuote(symbol);
+    return Promise.resolve(q ? { symbol, bid: q.bid, ask: q.ask, timestamp: q.at } : null);
   },
   getMarketDataHealth: () => market.getStatus().then((s) => ({ status: s.connected ? "ok" : "down", ...s })),
   getEconomicCalendar: () => Promise.resolve([]),
